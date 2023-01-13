@@ -13,8 +13,12 @@ banner(){
 }
 banner "Azure Containers Chat Team - EMEA"
 printf "|`tput bold` %-40s `tput sgr0`|\n" "Pre-requisites:"
-printf "|`tput bold` %-40s `tput sgr0`|\n" "INSTALL JQUERY/JQ"
-printf "|`tput bold` %-40s `tput sgr0`|\n" "CHANGE PARAMS.SH - SPECIFIC SCENARIOS"
+printf "|`tput bold` %-40s `tput sgr0`|\n" "Install JQuery/JQ"
+printf "|`tput bold` %-40s `tput sgr0`|\n" "Change params.sh - specific scenarios"
+printf "|`tput bold` %-40s `tput sgr0`|\n" "Generate ssh key pair with"
+printf "|`tput bold` %-40s `tput sgr0`|\n" "ssh-keygen -o -t rsa -b 4096 -C email"
+printf "|`tput bold` %-40s `tput sgr0`|\n" "export ADMIN_USERNAME_SSH_KEYS_PUB"
+
 sleep 2
 showHelp() {
 cat << EOF  
@@ -40,6 +44,7 @@ EOF
 SCRIPT_PATH="$( cd "$(dirname "$0")" ; pwd -P )"
 SCRIPT_NAME="$(echo $0 | sed 's|\.\/||g')"
 SCRIPT_VERSION="Version v1.0 20220204"
+
 # Load parameters
 set -e
 . ./params.sh
@@ -107,11 +112,46 @@ fi
 }
 
 function destroy() {
-  echo -e "\n--> Warning: You are about to delete the ${AKS_RG_NAME} resource group and the whole environment\n"
-  az group delete --name $AKS_RG_NAME
+  echo -e "\n--> Warning: You are about to delete the whole environment\n"
+  AKS_GROUP_EXIST=$(az group show -g $AKS_RG_NAME &>/dev/null; echo $?)
+  VM_GROUP_EXIST=$(az group show -g $LINUX_VM_RG &>/dev/null; echo $?)
+  if [[ $AKS_GROUP_EXIST -eq 0 ]]
+   then
+      echo -e "\n--> Warning: Deleting $AKS_RG_NAME resource group ...\n"
+      az group delete --name $AKS_RG_NAME
+  elif [[ $VM_GROUP_EXIST -eq 0 ]]
+   then
+      echo -e "\n--> Warning: Deleting $LINUX_VM_RG resource group ...\n"
+      az group delete --name $LINUX_VM_RG
+      exit 5
+   else
+   echo -e "\n--> Info: Resource Groups $AKS_RG_NAME OR $LINUX_VM_RG don't exist in this subscription ...\n"
+  fi
+  
 }
 
-azure_cluster(){
+## Coundown function
+function countdown() {
+   IFS=:
+   set -- $*
+   secs=$(( ${1#0} * 3600 + ${2#0} * 60 + ${3#0} ))
+   while [ $secs -gt 0 ]
+   do
+     sleep 1 &
+     printf "\r%02d:%02d:%02d" $((secs/3600)) $(( (secs/60)%60)) $((secs%60))
+     secs=$(( $secs - 1 ))
+     wait
+   done
+   echo
+ }
+
+
+function azure_cluster() {
+AKS_RG_NAME=$AKS_RG_NAME-$PURPOSE
+AKS_CLUSTER_NAME=$AKS_CLUSTER_NAME-$PURPOSE
+AKS_VNET="vnet-"$AKS_CLUSTER_NAME
+AKS_SNET="snet-"$AKS_CLUSTER_NAME
+
 ## Create Resource Group for Cluster VNet
 echo "Create RG for Cluster Vnet"
 az group create \
@@ -520,8 +560,8 @@ then
   az network vnet subnet create \
     --resource-group $AKS_RG_NAME \
     --vnet-name $AKS_VNET \
-    --name $JS_VM_SUBNET_NAME \
-    --address-prefixes $JS_VM_SNET_CIDR \
+    --name $LINUX_VM_SUBNET_NAME \
+    --address-prefixes $LINUX_VM_SNET_CIDR \
     --debug
   
   
@@ -529,13 +569,13 @@ then
   echo "Create NSG"
   az network nsg create \
     --resource-group $AKS_RG_NAME \
-    --name $JS_VM_NSG_NAME \
+    --name $LINUX_VM_NSG_NAME \
     --debug
   
   ## Public IP Create
   echo "Create Public IP"
   az network public-ip create \
-    --name $JS_VM_PUBLIC_IP_NAME \
+    --name $LINUX_VM_PUBLIC_IP_NAME \
     --resource-group $AKS_RG_NAME \
     --debug
   
@@ -544,46 +584,46 @@ then
   echo "Create VM Nic"
   az network nic create \
     --resource-group $AKS_RG_NAME \
-    --vnet-name $JS_VNET_NAME \
-    --subnet $JS_VM_SUBNET_NAME \
-    --name $JS_VM_NIC_NAME \
-    --network-security-group $JS_VM_NSG_NAME \
+    --vnet-name $LINUX_VNET_NAME \
+    --subnet $LINUX_VM_SUBNET_NAME \
+    --name $LINUX_VM_NIC_NAME \
+    --network-security-group $LINUX_VM_NSG_NAME \
     --debug 
   
   ## Attache Public IP to VM NIC
   echo "Attach Public IP to VM NIC"
   az network nic ip-config update \
-    --name $JS_VM_DEFAULT_IP_CONFIG \
-    --nic-name $JS_VM_NIC_NAME \
+    --name $LINUX_VM_DEFAULT_IP_CONFIG \
+    --nic-name $LINUX_VM_NIC_NAME \
     --resource-group $AKS_RG_NAME \
-    --public-ip-address $JS_VM_PUBLIC_IP_NAME \
+    --public-ip-address $LINUX_VM_PUBLIC_IP_NAME \
     --debug
   
   ## Update NSG in VM Subnet
   echo "Update NSG in VM Subnet"
   az network vnet subnet update \
     --resource-group $AKS_RG_NAME \
-    --name $JS_VM_SUBNET_NAME \
+    --name $LINUX_VM_SUBNET_NAME \
     --vnet-name $AKS_VNET \
-    --network-security-group $JS_VM_NSG_NAME \
+    --network-security-group $LINUX_VM_NSG_NAME \
     --debug
 
   ## Create VM
   echo "Create VM"
   az vm create \
     --resource-group $AKS_RG_NAME \
-    --authentication-type $JS_AUTH_TYPE \
-    --name $JS_VM_NAME \
-    --computer-name $JS_VM_INTERNAL_NAME \
-    --image $JS_IMAGE \
-    --size $JS_VM_SIZE \
+    --authentication-type $LINUX_AUTH_TYPE \
+    --name $LINUX_VM_NAME \
+    --computer-name $LINUX_VM_INTERNAL_NAME \
+    --image $LINUX_VM_IMAGE \
+    --size $LINUX_VM_SIZE \
     --admin-username $GENERIC_ADMIN_USERNAME \
     --ssh-key-values $ADMIN_USERNAME_SSH_KEYS_PUB \
-    --storage-sku $JS_VM_STORAGE_SKU \
-    --os-disk-size-gb $JS_VM_OS_DISK_SIZE \
-    --os-disk-name $JS_VM_OS_DISK_NAME \
-    --nics $JS_VM_NIC_NAME \
-    --tags $JS_TAGS \
+    --storage-sku $LINUX_VM_STORAGE_SKU \
+    --os-disk-size-gb $LINUX_VM_OS_DISK_SIZE \
+    --os-disk-name $LINUX_VM_OS_DISK_NAME \
+    --nics $LINUX_VM_NIC_NAME \
+    --tags $LINUX_TAGS \
     --debug
   
   echo "Sleeping 45s - Allow time for Public IP"
@@ -593,20 +633,20 @@ then
   echo "Getting Public IP of VM"
   VM_PUBLIC_IP=$(az network public-ip list \
     --resource-group $AKS_RG_NAME \
-    --output json | jq -r ".[] | select ( .name == \"$JS_VM_PUBLIC_IP_NAME\" ) | [ .ipAddress ] | @tsv")
+    --output json | jq -r ".[] | select ( .name == \"$LINUX_VM_PUBLIC_IP_NAME\" ) | [ .ipAddress ] | @tsv")
   echo "Public IP of VM is:" 
   echo $VM_PUBLIC_IP
 
   ## Allow SSH from my Home
   echo "Update VM NSG to allow SSH"
   az network nsg rule create \
-    --nsg-name $JS_VM_NSG_NAME \
+    --nsg-name $LINUX_VM_NSG_NAME \
     --resource-group $AKS_RG_NAME \
     --name ssh_allow \
     --priority 100 \
     --source-address-prefixes $MY_HOME_PUBLIC_IP \
     --source-port-ranges '*' \
-    --destination-address-prefixes $JS_VM_PRIV_IP \
+    --destination-address-prefixes $LINUX_VM_PRIV_IP \
     --destination-port-ranges 22 \
     --access Allow \
     --protocol Tcp \
@@ -678,11 +718,12 @@ fi
 echo "Getting Cluster Credentials"
 az aks get-credentials --resource-group $AKS_RG_NAME --name $AKS_CLUSTER_NAME --overwrite-existing
 }
-private_cluster () {
-  ##!/usr/bin/env bash
-set -e
-. ./params.sh
-
+function private_cluster () {
+AKS_RG_NAME=$AKS_RG_NAME-$PURPOSE
+AKS_CLUSTER_NAME=$AKS_CLUSTER_NAME-$PURPOSE
+AKS_VNET="vnet-"$AKS_CLUSTER_NAME
+AKS_SNET="snet-"$AKS_CLUSTER_NAME
+LINUX_VM_RG=$LINUX_VM_RG-$PURPOSE
 
 ## Create Resource Group for Cluster VNet
 echo "Create RG for Cluster Vnet"
@@ -1070,8 +1111,8 @@ if [[ "$AKS_HAS_JUMP_SERVER" == "1" ]]
 then
   ## Get Jump Server Vnet ID
   echo "Get Jump Server Vnet ID"
-  LJ_VNET_ID=$(az network vnet list -o json | jq -r ".[] | select( .name == \"$EXISTING_JUMP_SERVER_VNET_NAME\" ) | [ .id ] | @tsv" | column -t)
-  LJ_VNET_RG=$(az network vnet list -o json | jq -r ".[] | select( .name == \"$EXISTING_JUMP_SERVER_VNET_NAME\" ) | [ .resourceGroup ] | @tsv" | column -t)
+  LINUX_VM_VNET_ID=$(az network vnet list -o json | jq -r ".[] | select( .name == \"$EXISTING_JUMP_SERVER_VNET_NAME\" ) | [ .id ] | @tsv" | column -t)
+  LINUX_VM_VNET_RG=$(az network vnet list -o json | jq -r ".[] | select( .name == \"$EXISTING_JUMP_SERVER_VNET_NAME\" ) | [ .resourceGroup ] | @tsv" | column -t)
 
 
   ## Configure Private DNS Link to Jumpbox VM
@@ -1093,9 +1134,9 @@ then
 
   echo "Create Priv Dns Link to Jump Server Vnet"
   az network private-dns link vnet create \
-    --name "${EXISTING_JUMP_SERVER_VNET_NAME}-in-${LJ_VNET_RG}" \
+    --name "${EXISTING_JUMP_SERVER_VNET_NAME}-in-${LINUX_VM_VNET_RG}" \
     --resource-group $AKS_INFRA_RG \
-    --virtual-network $LJ_VNET_ID \
+    --virtual-network $LINUX_VM_VNET_ID \
     --zone-name $AKS_INFRA_RG_PRIV_DNS_ZONE \
     --registration-enabled false \
     --debug 
@@ -1111,33 +1152,33 @@ then
   ## Create Resource Group for Jump AKS VNet
   echo "Configuring Networking for Jump AKS Vnet"
   az group create \
-    --name $LJ_RG \
-    --location $LJ_LOCATION \
+    --name $LINUX_VM_RG \
+    --location $LINUX_VM_LOCATION \
     --debug
 
   ## Create Jump VNet and SubNet
   echo "Create Jump Box Vnet and Subnet"
   az network vnet create \
-    --resource-group $LJ_RG \
-    --name $LJ_VNET \
-    --address-prefix $LJ_VNET_CIDR \
-    --subnet-name $LJ_SNET \
-    --subnet-prefix $LJ_SNET_CIDR \
+    --resource-group $LINUX_VM_RG \
+    --name $LINUX_VM_VNET \
+    --address-prefix $LINUX_VM_VNET_CIDR \
+    --subnet-name $LINUX_VM_SUBNET_NAME \
+    --subnet-prefix $LINUX_VM_SNET_CIDR \
     --debug
 
   
   ## VM NSG Create
   echo "Create NSG"
   az network nsg create \
-    --resource-group $LJ_RG \
-    --name $LJ_NSG_NAME \
+    --resource-group $LINUX_VM_RG \
+    --name $LINUX_VM_NSG_NAME \
     --debug
   
   ## Public IP Create
   echo "Create Public IP"
   az network public-ip create \
-    --name $LJ_PIP \
-    --resource-group $LJ_RG \
+    --name $LINUX_VM_PUBLIC_IP_NAME \
+    --resource-group $LINUX_VM_RG \
     --allocation-method dynamic \
     --sku basic \
     --debug
@@ -1145,67 +1186,67 @@ then
   ## VM Nic Create
   echo "Create VM Nic"
   az network nic create \
-    --resource-group $LJ_RG \
-    --vnet-name $LJ_VNET \
-    --subnet $LJ_SNET \
-    --name $LJ_NIC_NAME \
-    --network-security-group $LJ_NSG_NAME \
+    --resource-group $LINUX_VM_RG \
+    --vnet-name $LINUX_VM_VNET \
+    --subnet $LINUX_VM_SUBNET_NAME \
+    --name $LINUX_VM_NIC_NAME \
+    --network-security-group $LINUX_VM_NSG_NAME \
     --debug 
   
   ## Attache Public IP to VM NIC
   echo "Attach Public IP to VM NIC"
   az network nic ip-config update \
     --name $LJ_DEFAULT_IP_CONFIG \
-    --nic-name $LJ_NIC_NAME \
-    --resource-group $LJ_RG \
-    --public-ip-address $LJ_PIP \
+    --nic-name $LINUX_VM_NIC_NAME \
+    --resource-group $LINUX_VM_RG \
+    --public-ip-address $LINUX_VM_PUBLIC_IP_NAME \
     --debug
   
   ## Update NSG in VM Subnet
   echo "Update NSG in VM Subnet"
   az network vnet subnet update \
-    --resource-group $LJ_RG \
-    --name $LJ_SNET \
-    --vnet-name $LJ_VNET \
-    --network-security-group $LJ_NSG_NAME \
+    --resource-group $LINUX_VM_RG \
+    --name $LINUX_VM_SUBNET_NAME \
+    --vnet-name $LINUX_VM_VNET \
+    --network-security-group $LINUX_VM_NSG_NAME \
     --debug
 
   ## Create VM
   echo "Create VM"
   az vm create \
-    --resource-group $LJ_RG \
+    --resource-group $LINUX_VM_RG \
     --authentication-type $LJ_AUTH_TYPE \
-    --name $LJ_NAME \
-    --computer-name $LJ_INTERNAL_NAME \
-    --image $LJ_IMAGE \
-    --size $LJ_SIZE \
+    --name $LINUX_VM_NAME \
+    --computer-name $LINUX_VM_INTERNAL_NAME \
+    --image $LINUX_VM_IMAGE \
+    --size $LINUX_VM_SIZE \
     --admin-username $GENERIC_ADMIN_USERNAME \
     --ssh-key-values $ADMIN_USERNAME_SSH_KEYS_PUB \
-    --storage-sku $LJ_STORAGE_SKU \
-    --os-disk-size-gb $LJ_OS_DISK_SIZE \
-    --os-disk-name $LJ_OS_DISK_NAME \
-    --nics $LJ_NIC_NAME \
-    --tags $LJ_TAGS \
+    --storage-sku $LINUX_VM_STORAGE_SKU \
+    --os-disk-size-gb $LINUX_VM_OS_DISK_SIZE \
+    --os-disk-name $LINUX_VM_OS_DISK_NAME \
+    --nics $LINUX_VM_NIC_NAME \
+    --tags $LINUX_TAGS \
     --debug
   
   ## Output Public IP of VM
   echo "Getting Public IP of VM"
   VM_PUBLIC_IP=$(az network public-ip list \
-    --resource-group $LJ_RG \
-    --output json | jq -r ".[] | select ( .name == \"$LJ_PIP\" ) | [ .ipAddress ] | @tsv")
+    --resource-group $LINUX_VM_RG \
+    --output json | jq -r ".[] | select ( .name == \"$LINUX_VM_PUBLIC_IP_NAME\" ) | [ .ipAddress ] | @tsv")
   echo "Public IP of VM is:" 
   echo $VM_PUBLIC_IP
 
   ## Allow SSH from my Home
   echo "Update VM NSG to allow SSH"
   az network nsg rule create \
-    --nsg-name $LJ_NSG_NAME \
-    --resource-group $LJ_RG \
+    --nsg-name $LINUX_VM_NSG_NAME \
+    --resource-group $LINUX_VM_RG \
     --name ssh_allow \
     --priority 100 \
     --source-address-prefixes $MY_HOME_PUBLIC_IP \
     --source-port-ranges '*' \
-    --destination-address-prefixes $LJ_PRIV_IP \
+    --destination-address-prefixes $LINUX_VM_PRIV_IP \
     --destination-port-ranges 22 \
     --access Allow \
     --protocol Tcp \
@@ -1219,26 +1260,26 @@ then
     --query id \
     --output tsv)
 
-  LJ_VNET_ID=$(az network vnet show \
-    --resource-group $LJ_RG \
-    --name $LJ_VNET \
+  LINUX_VM_VNET_ID=$(az network vnet show \
+    --resource-group $LINUX_VM_RG \
+    --name $LINUX_VM_VNET \
     --query id \
     --output tsv)
 
   echo "Peering VNet - AKS-JBOX"
   az network vnet peering create \
     --resource-group $AKS_RG_NAME \
-    --name "${AKS_VNET}-to-${LJ_VNET}" \
+    --name "${AKS_VNET}-to-${LINUX_VM_VNET}" \
     --vnet-name $AKS_VNET \
-    --remote-vnet $LJ_VNET_ID \
+    --remote-vnet $LINUX_VM_VNET_ID \
     --allow-vnet-access \
     --debug
 
   echo "Peering Vnet - JBOX-AKS"
   az network vnet peering create \
-    --resource-group $LJ_RG \
-    --name "${LJ_VNET}-to-${AKS_VNET}" \
-    --vnet-name $LJ_VNET \
+    --resource-group $LINUX_VM_RG \
+    --name "${LINUX_VM_VNET}-to-${AKS_VNET}" \
+    --vnet-name $LINUX_VM_VNET \
     --remote-vnet $AKS_VNET_ID \
     --allow-vnet-access \
     --debug
@@ -1260,9 +1301,9 @@ then
   
   echo "Create Priv Dns Link to Jump Server Vnet"
   az network private-dns link vnet create \
-    --name "${LJ_VNET}-${LJ_RG}" \
+    --name "${LINUX_VM_VNET}-${LINUX_VM_RG}" \
     --resource-group $AKS_INFRA_RG \
-    --virtual-network $LJ_VNET_ID \
+    --virtual-network $LINUX_VM_VNET_ID \
     --zone-name $AKS_INFRA_RG_PRIV_DNS_ZONE \
     --registration-enabled false \
     --debug  
@@ -1329,17 +1370,378 @@ az aks get-credentials \
   --resource-group $AKS_RG_NAME \
   --name $AKS_CLUSTER_NAME \
   --overwrite-existing
+}
+
+
+linux_dns () {
+
+echo "On which Resource Group you want to install the DNS server"
+read -e DNS_RG_NAME
+
+## Create Resource Group for DNS Server
+echo "Create RG for DNS Server"
+az group create \
+  --name $DNS_RG_NAME \
+  --location $DNS_RG_LOCATION \
+  --tags env=dns \
+  --debug
+
+## VM DNS Server Subnet Creation
+echo "Create VM DNS Server Subnet"
+az network vnet subnet create \
+  --resource-group $DNS_RG_NAME \
+  --vnet-name $DNS_VNET_NAME \
+  --name $VM_DNS_SUBNET_NAME \
+  --address-prefixes $VM_DNS_SNET_CIDR \
+  --debug
+
+
+## VM NSG Create
+echo "Create NSG"
+az network nsg create \
+  --resource-group $MAIN_VNET_RG \
+  --name $VM_NSG_NAME \
+  --debug
+
+
+## Public IP Create
+echo "Create Public IP"
+az network public-ip create \
+  --name $VM_DNS_PUBLIC_IP_NAME \
+  --resource-group $MAIN_VNET_RG \
+  --debug
+
+
+## VM Nic Create
+echo "Create VM Nic"
+az network nic create \
+  --resource-group $MAIN_VNET_RG \
+  --vnet-name $MAIN_VNET_NAME \
+  --subnet $VM_DNS_SUBNET_NAME \
+  --name $VM_NIC_NAME \
+  --network-security-group $VM_NSG_NAME \
+  --debug 
+
+
+## Attach Public IP to VM NIC
+echo "Attach Public IP to VM NIC"
+az network nic ip-config update \
+  --name $VM_DNS_DEFAULT_IP_CONFIG \
+  --nic-name $VM_NIC_NAME \
+  --resource-group $MAIN_VNET_RG \
+  --public-ip-address $VM_DNS_PUBLIC_IP_NAME \
+  --debug
+
+
+## Update NSG in VM Subnet
+echo "Update NSG in VM Subnet"
+az network vnet subnet update \
+  --resource-group $MAIN_VNET_RG \
+  --name $VM_DNS_SUBNET_NAME \
+  --vnet-name $MAIN_VNET_NAME \
+  --network-security-group $VM_NSG_NAME \
+  --debug
+
+
+## Create VM
+echo "Create VM"
+az vm create \
+  --resource-group $MAIN_VNET_RG \
+  --authentication-type $VM_AUTH_TYPE \
+  --name $VM_NAME \
+  --computer-name $VM_INTERNAL_NAME \
+  --image $VM_IMAGE \
+  --size $VM_SIZE \
+  --admin-username $GENERIC_ADMIN_USERNAME \
+  --ssh-key-values $ADMIN_USERNAME_SSH_KEYS_PUB \
+  --storage-sku $VM_STORAGE_SKU \
+  --os-disk-size-gb $VM_OS_DISK_SIZE \
+  --os-disk-name $VM_OS_DISK_NAME \
+  --nics $VM_NIC_NAME \
+  --tags $VM_TAGS \
+  --debug
+
+echo "Sleeping 45s - Allow time for Public IP"
+sleep 45
+
+## Output Public IP of VM
+echo "Public IP of VM is:"
+VM_PUBLIC_IP=$(az network public-ip list \
+  --resource-group $MAIN_VNET_RG \
+  --output json | jq -r ".[] | select (.name==\"$VM_DNS_PUBLIC_IP_NAME\") | [ .ipAddress] | @tsv")
+
+## Allow SSH from local ISP
+echo "Update VM NSG to allow SSH"
+az network nsg rule create \
+  --nsg-name $VM_NSG_NAME \
+  --resource-group $MAIN_VNET_RG \
+  --name ssh_allow \
+  --priority 100 \
+  --source-address-prefixes $VM_MY_ISP_IP \
+  --source-port-ranges '*' \
+  --destination-address-prefixes $VM_DNS_PRIV_IP \
+  --destination-port-ranges 22 \
+  --access Allow \
+  --protocol Tcp \
+  --description "Allow from MY ISP IP"
+
+
+## Input Key Fingerprint
+echo "Input Key Fingerprint" 
+FINGER_PRINT_CHECK=$(ssh-keygen -F $VM_PUBLIC_IP >/dev/null | ssh-keyscan -H $VM_PUBLIC_IP | wc -l)
+
+while [[ "$FINGER_PRINT_CHECK" = "0" ]]
+do
+    echo "not good to go: $FINGER_PRINT_CHECK"
+    echo "Sleeping for 5s..."
+    sleep 5
+    FINGER_PRINT_CHECK=$(ssh-keygen -F $VM_PUBLIC_IP >/dev/null | ssh-keyscan -H $VM_PUBLIC_IP | wc -l)
+done
+
+echo "Goood to go with Input Key Fingerprint"
+ssh-keygen -F $VM_PUBLIC_IP >/dev/null | ssh-keyscan -H $VM_PUBLIC_IP >> ~/.ssh/known_hosts
 
 }
-options=("Azure Cluster" "Kubenet Cluster" "Private Cluster" "Linux DNS VM" "" "" "Destroy Environment" "Quit")
+
+function linux_subnet(){
+
+echo "On which Resource Group does the Subnet belong: "
+read -e LINUX_RG_NAME
+
+#LINUX_GROUP_EXIST=$(az group show -g $LINUX_RG_NAME &>/dev/null; echo $?)
+#if [[ $LINUX_GROUP_EXIST -ne 0 ]]
+#   then
+#    echo -e "\n--> Creating the non existent Resource Group ${LINUX_RG_NAME} ...\n"
+#    az group create --name $LINUX_RG_NAME --location $LINUX_RG_LOCATION
+#fi
+
+#read -p "Enter [y/n] : " opt
+
+echo "On which Vnet do you want to deploy the Linux VM:"
+read -e LINUX_VM_VNET_NAME
+
+echo "On which Subnet do you want to deploy the Linux VM:"
+read -e LINUX_VM_SUBNET_NAME
+
+echo "What is the name of the NSG attached to the Subnet where you want to deploy the Linux VM:"
+read -e SUBNET_NSG_NAME
+
+
+ ## Public IP Create
+echo "Create Public IP"
+az network public-ip create \
+  --name $LINUX_VM_PUBLIC_IP_NAME \
+  --resource-group $LINUX_RG_NAME \
+  --debug
+## VM Nic Create
+echo "Create VM Nic"
+az network nic create \
+  --resource-group $LINUX_RG_NAME \
+  --vnet-name $LINUX_VM_VNET_NAME \
+  --subnet $LINUX_VM_SUBNET_NAME \
+  --name $LINUX_VM_NIC_NAME \
+  --network-security-group $SUBNET_NSG_NAME \
+  --debug
+
+## Attach Public IP to VM NIC
+echo "Attach Public IP to VM NIC"
+az network nic ip-config update \
+  --name $LINUX_VM_DEFAULT_IP_CONFIG \
+  --nic-name $LINUX_VM_NIC_NAME \
+  --resource-group $LINUX_RG_NAME \
+  --public-ip-address $LINUX_VM_PUBLIC_IP_NAME \
+  --debug
+
+## Create VM
+echo "Creating Virtual Machine...."
+az vm create \
+  --resource-group $LINUX_RG_NAME \
+  --authentication-type $LINUX_AUTH_TYPE \
+  --name $LINUX_VM_NAME \
+  --computer-name $LINUX_VM_INTERNAL_NAME \
+  --image $LINUX_VM_IMAGE \
+  --size $LINUX_VM_SIZE \
+  --admin-username $GENERIC_ADMIN_USERNAME \
+  --ssh-key-values $ADMIN_USERNAME_SSH_KEYS_PUB \
+  --storage-sku $LINUX_VM_STORAGE_SKU \
+  --os-disk-size-gb $LINUX_VM_OS_DISK_SIZE \
+  --os-disk-name $LINUX_VM_OS_DISK_NAME \
+  --nics $LINUX_VM_NIC_NAME \
+  --tags $LINUX_TAGS \
+  --debug 
+
+  echo "Sleeping 30s - Allow time for Public IP"
+  countdown "00:00:30"
+
+  ## Output Public IP of VM
+  echo "Getting Public IP of VM"
+  LINUX_VM_PUBLIC_IP=$(az network public-ip list \
+    --resource-group $LINUX_RG_NAME \
+    --output json | jq -r ".[] | select ( .name == \"$LINUX_VM_PUBLIC_IP_NAME\" ) | [ .ipAddress ] | @tsv")
+  echo "Public IP of VM is:"
+  echo $LINUX_VM_PUBLIC_IP
+
+  ## Get Priv IP of Linux JS VM
+  echo "Getting Linux VM Priv IP"
+  LINUX_PRIV_IP=$(az vm list-ip-addresses --resource-group $LINUX_RG_NAME --name $LINUX_VM_NAME --output json | jq -r ".[] | [ .virtualMachine.network.privateIpAddresses[0] ] | @tsv")
+
+  ## Allow SSH from my Home
+  echo "Update Subnet NSG to allow SSH"
+  az network nsg rule create \
+    --nsg-name $SUBNET_NSG_NAME \
+    --resource-group $LINUX_RG_NAME \
+    --name ssh_allow \
+    --priority 100 \
+    --source-address-prefixes $MY_HOME_PUBLIC_IP \
+    --source-port-ranges '*' \
+    --destination-address-prefixes $LINUX_PRIV_IP \
+    --destination-port-ranges 22 \
+    --access Allow \
+    --protocol Tcp \
+    --description "Allow from MY ISP IP"
+
+  ## Checking SSH connectivity
+    echo "Testing SSH Conn..."
+    while :
+    do
+      if [ "$(ssh -i "$LINUX_SSH_PRIV_KEY" -o 'StrictHostKeyChecking no' -o "BatchMode=yes" -o "ConnectTimeout 5" $GENERIC_ADMIN_USERNAME@$LINUX_VM_PUBLIC_IP echo up 2>&1)" == "up" ];
+      then
+        echo "Can connect to $LINUX_VM_PUBLIC_IP, continue"
+        break
+      else
+        echo "Keep trying...."
+       fi
+     done
+
+  echo "Go to go with Input Key Fingerprint"
+  ssh-keygen -F $LINUX_VM_PUBLIC_IP >/dev/null | ssh-keyscan -H $LINUX_VM_PUBLIC_IP >> ~/.ssh/known_hosts
+
+  ## Install and update software
+  echo "Updating VM and Stuff"
+  ssh -i $LINUX_SSH_PRIV_KEY $GENERIC_ADMIN_USERNAME@$LINUX_VM_PUBLIC_IP "sudo apt update && sudo apt upgrade -y"
+
+  ## VM Install software
+  echo "VM Install software"
+  ssh -i $LINUX_SSH_PRIV_KEY $GENERIC_ADMIN_USERNAME@$LINUX_VM_PUBLIC_IP sudo apt install tcpdump wget snap dnsutils -y
+
+  ## Add Az Cli
+  echo "Add Az Cli"
+  ssh -i $LINUX_SSH_PRIV_KEY $GENERIC_ADMIN_USERNAME@$LINUX_VM_PUBLIC_IP "curl -sL https://aka.ms/InstallAzureCLIDeb | sudo bash"
+
+  ## Install Kubectl
+  echo "Install Kubectl"
+  ssh -i $LINUX_SSH_PRIV_KEY $GENERIC_ADMIN_USERNAME@$LINUX_VM_PUBLIC_IP sudo snap install kubectl --classic
+
+  ## Install JQ
+  echo "Install JQ"
+  ssh -i $LINUX_SSH_PRIV_KEY $GENERIC_ADMIN_USERNAME@$LINUX_VM_PUBLIC_IP sudo snap install jq
+
+  ## Add Kubectl completion
+  echo "Add Kubectl completion"
+  ssh -i $LINUX_SSH_PRIV_KEY $GENERIC_ADMIN_USERNAME@$LINUX_VM_PUBLIC_IP "source <(kubectl completion bash)"
+
+  echo "Public IP of the Virtual Machine:"
+  echo $LINUX_VM_PUBLIC_IP
+  
+  ssh -i $LINUX_SSH_PRIV_KEY $GENERIC_ADMIN_USERNAME@$LINUX_VM_PUBLIC_IP
+}
+
+function windows_subnet(){
+# Windows Jump Server Public IP Create
+echo "Create Public IP - Windows"
+az network public-ip create \
+  --name $WINDOWS_JS_PUBLIC_IP_NAME \
+  --resource-group $RG_NAME \
+  --debug
+
+echo "Create Windows Jump Server NSG"
+az network nsg create \
+  --resource-group $RG_NAME \
+  --name $WINDOWS_JS_NSG_NAME \
+  --debug
+## Windows VM Nic Create
+echo "Create Windows VM Nic"
+az network nic create \
+  --resource-group $RG_NAME \
+  --vnet-name $VNET_NAME \
+  --subnet $VM_SUBNET_NAME \
+  --name $WINDOWS_JS_NIC_NAME \
+  --network-security-group $WINDOWS_JS_NSG_NAME \
+  --debug
+
+## Update NSG in Windows VM Subnet
+echo "Update NSG in VM Subnet"
+az network vnet subnet update \
+  --resource-group $RG_NAME \
+  --name $VM_SUBNET_NAME \
+  --vnet-name $VNET_NAME \
+  --network-security-group $WINDOWS_JS_NSG_NAME \
+  --debug
+
+### Windows Create VM
+echo "Create Windows VM"
+az vm create \
+  --resource-group $RG_NAME \
+  --name $WINDOWS_JS_NAME \
+  --image $WINDOWS_JS_IMAGE \
+  --admin-username $GENERIC_ADMIN_USERNAME \
+  --admin-password $WINDOWS_AKS_ADMIN_PASSWORD \
+  --nics $WINDOWS_JS_NIC_NAME \
+  --tags $WINDOWS_JS_TAGS \
+  --computer-name $WINDOWS_JS_INTERNAL_NAME \
+  --authentication-type password \
+  --size $WINDOWS_JS_SIZE \
+  --storage-sku $WINDOWS_JS_STORAGE_SKU \
+  --os-disk-size-gb $WINDOWS_JS_OS_DISK_SIZE \
+  --os-disk-name $WINDOWS_JS_OS_DISK_NAME \
+  --nsg-rule NONE \
+  --debug
+
+
+# Getting Public IP of Windows JS VM
+echo "Getting Public IP of Windows JS VM"
+WINDOWS_JS_AZ_PUBLIC_IP=$(az network public-ip list \
+  --resource-group $RG_NAME \
+  --output json | jq --arg pip $WINDOWS_JS_PUBLIC_IP_NAME -r '.[] | select( .name == $pip ) | [ .ipAddress ] | @tsv')
+
+PROCESS_NSG_FOR_LINUX_VM="true"
+TIME=$SECONDS
+
+## Get Priv IP of Windows JS VM
+echo "Getting Windows JS VM Priv IP"
+WINDOWS_JS_PRIV_IP=$(az vm list-ip-addresses --resource-group $RG_NAME --name $WINDOWS_JS_NAME --output json | jq -r ".[] | [ .virtualMachine.network.privateIpAddresses[0] ] | @tsv")
+
+
+## Allow RDC from my Home to Windows JS VM
+echo "Update Windows JS VM NSG to allow RDP"
+az network nsg rule create \
+  --nsg-name $WINDOWS_JS_NSG_NAME \
+  --resource-group $RG_NAME \
+  --name rdc_allow \
+  --priority 100 \
+  --source-address-prefixes $MY_HOME_PUBLIC_IP \
+  --source-port-ranges '*' \
+  --destination-address-prefixes $WINDOWS_JS_PRIV_IP \
+  --destination-port-ranges 3389 \
+  --access Allow \
+  --protocol Tcp \
+  --description "Allow from MY ISP IP"
+
+
+echo ""
+echo "Windows JS VM Public IP: $WINDOWS_JS_AZ_PUBLIC_IP"
+
+}
+
+options=("Azure Cluster" "Kubenet Cluster" "Private Cluster" "Linux DNS VM" "Windows DNS VM" "Create Linux VM on Subnet" "Create Windows VM on Subnet" "Destroy Environment" "Quit")
 select opt in "${options[@]}"
 do    
 	case $opt in
         "Azure Cluster")
         az_login_check
-        PURPOSE="cni"
         check_k8s_version
         sleep 2
+        PURPOSE="cni"
         azure_cluster
         break;;
         "Kubenet Cluster")
@@ -1364,8 +1766,13 @@ do
 	      "Windows DNS VM")
         
         break;;
-	      "Ingress Controller")
-       	
+	      "Create Linux VM on Subnet")
+        az_login_check
+        linux_subnet
+        break;;
+        "Create Windows VM on Subnet")
+        az_login_check
+        windows_subnet
         break;;
 	      "Destroy Environment")
         az_login_check
