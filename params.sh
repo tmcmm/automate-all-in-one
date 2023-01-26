@@ -3,6 +3,7 @@ PURPOSE="default"
 AKS_RG_LOCATION="westeurope"
 AKS_VERSION="1.24.6"
 AKS_VNET_2_OCTETS="10.4"   # Define the fisrt 2 octets for Vnet
+LINUX_VNET_2_OCTETS="10.5" # Define the fisrt 2 octets for Linux Vnet
 AKS_ZONES="1 2 3"          # Define AKS Zones
 AKS_2ND_NP_ZONES="1 2 3"   # Defines NP Zones
 
@@ -17,10 +18,10 @@ AKS_CLUSTER_DOCKER_BRIDGE="172.17.0.1/16"
 ## AKS Add-ons and other options
 AKS_HAS_AZURE_MONITOR="0"     # 1 = AKS has Az Mon enabled
 AKS_HAS_AUTO_SCALER="0"       # 1 = AKS has Auto Scaler enabled
-AKS_HAS_MANAGED_IDENTITY="0"  # 1 = AKS has Managed Identity enabled
+AKS_HAS_MANAGED_IDENTITY="1"  # 1 = AKS has Managed Identity enabled
 AKS_HAS_NETWORK_POLICY="0"    # 1 = AKS has Azure Net Pol enabled
 AKS_HAS_2ND_NODEPOOL="1"      # 1 = AKS has second npool
-AKS_CREATE_JUMP_SERVER="1"    # 1 = If we need to create a JS from Other Vnet 
+AKS_CREATE_JUMP_SERVER="0"    # 1 = If we need to create a JS from Other Vnet 
 AKS_HAS_JUMP_SERVER="0"       # 1 = If we already have a Jump Server from Other Vnet, with Peered Vnet 
 
 #########################################################################
@@ -59,16 +60,18 @@ CONTEXT="networking"
 LINUX_VM_LOCATION="$AKS_RG_LOCATION"
 LINUX_VM_VNET="vnet-users"
 LINUX_VM_RG="rg-vm-$AKS_CLUSTER_NAME"
-LINUX_VM_VNET_CIDR="$AKS_VNET_2_OCTETS.6.0/24"
+LINUX_VM_VNET_CIDR="$LINUX_VNET_2_OCTETS.6.0/24"
 LINUX_VM_SUBNET_NAME="subnet-users"
-LINUX_VM_SNET_CIDR="$AKS_VNET_2_OCTETS.7.0/28"
-LINUX_VM_PRIV_IP="$AKS_VNET_2_OCTETS.7.4/32"
+LINUX_VM_SNET_CIDR_CNI="$AKS_VNET_2_OCTETS.6.0/28"
+LINUX_VM_SNET_CIDR="$LINUX_VNET_2_OCTETS.6.0/28"
+LINUX_VM_PRIV_IP_CNI="$AKS_VNET_2_OCTETS.6.4/32"
+LINUX_VM_PRIV_IP="$LINUX_VNET_2_OCTETS.6.4/32"
+LINUX_VM_NAME="sshclient-"$CONTEXT
 LINUX_VM_NSG_NAME="$LINUX_VM_NAME""_nsg"
 LINUX_GENERIC_ADMIN_USERNAME="azureuser"
 LINUX_SSH_PRIV_KEY="/home/$USER/.ssh/id_rsa"
 LINUX_VM_DEFAULT_IP_CONFIG="ipconfig1"
 LINUX_AUTH_TYPE="ssh"
-LINUX_VM_NAME="sshclient-"$CONTEXT
 LINUX_VM_INTERNAL_NAME="netdebug-vm"
 LINUX_VM_PUBLIC_IP_NAME="$LINUX_VM_NAME""-publicip"
 LINUX_VM_IMAGE_PROVIDER="Canonical"
@@ -90,33 +93,6 @@ LINUX_VM_NIC_NAME="$LINUX_VM_NAME""_nic01"
 LINUX_TAGS="env=kubernetes"
 
 
-## VM Settings for Jump Server - Private
-LJ_LOCATION="$AKS_RG_LOCATION"
-LJ_VNET="vnet-users"
-LJ_RG="rg-vm-$AKS_CLUSTER_NAME"
-LJ_VNET_CIDR="$AKS_VNET_2_OCTETS.6.0/24"
-LJ_SNET="subnet-users"
-LJ_SNET_CIDR="$AKS_VNET_2_OCTETS.7.0/28"
-LJ_PRIV_IP="$AKS_VNET_2_OCTETS.7.4/32"
-LJ_NAME="lclt-"$AKS_CLUSTER_NAME
-LJ_INTERNAL_NAME="lclt-"$AKS_CLUSTER_NAME
-LJ_IMAGE_PROVIDER="Canonical"
-LJ_IMAGE_OFFER="UbuntuServer"
-LJ_IMAGE_SKU="18.04-LTS"
-LJ_IMAGE_VERSION="latest"
-
-LJ_IMAGE="$LJ_IMAGE_PROVIDER:$LJ_IMAGE_OFFER:$LJ_IMAGE_SKU:$LJ_IMAGE_VERSION"
-LJ_SIZE="Standard_D2s_v3"
-LJ_OS_DISK_SIZE="40"
-LJ_PIP="$LJ_NAME-pip"
-LJ_DEFAULT_IP_CONFIG="ipconfig1"
-LJ_STORAGE_SKU="Standard_LRS"
-LJ_AUTH_TYPE="ssh"
-LJ_NSG_NAME="$LJ_NAME""_nsg"
-LJ_NIC_NAME="$LJ_NAME""nic01"
-LJ_OS_DISK_NAME="$LJ_NAME""_disk_01"
-LJ_TAGS="env=jump-server"
-
 ## DNS Parameters
 DNS_RG_LOCATION="westeurope"
 DNS_VNET_NAME="dns-vnet"
@@ -125,7 +101,7 @@ VM_DNS_SUBNET_NAME="dns-subnet"
 ## Running Options
 JUST_BIND="0"              # 1 - If we just want to deploy Bind server
 ALL="1"                    # 1 - If we want to deploy all, VM + Bind
-AKS_VNET_PREFIX="10.3"     # Having in mind Vnet Peering, we need to make sure no Vnet overlaps
+DNS_VNET_PREFIX="10.3"     # Having in mind Vnet Peering, we need to make sure no Vnet overlaps
 AKS_NAME="bcc"
 
 ## Core Networking
@@ -134,7 +110,7 @@ MAIN_VNET_NAME="vnet-aks-$AKS_NAME"
 MAIN_VNET_LOCATION="westeurope"
 
 ## AKS SubNet details
-AKS_SUBNET_CIDR="$AKS_VNET_PREFIX.0.0/23"
+AKS_SUBNET_CIDR="$DNS_VNET_PREFIX.0.0/23"
 
 ## Bind9 Forwarders
 VM_BIND_FORWARDERS_01="168.63.129.16"
@@ -142,11 +118,8 @@ VM_BIND_FORWARDERS_02="1.1.1.1"
 
 ## VM Specific Networking
 VM_DNS_SUBNET_NAME="snet-dns-server"
-VM_DNS_SNET_CIDR="$AKS_VNET_PREFIX.10.0/28"
-VM_DNS_PRIV_IP="$AKS_VNET_PREFIX.10.4/32"
-
-## Local ISP PIP
-VM_MY_ISP_IP=$(curl -s -4 ifconfig.io)
+VM_DNS_SNET_CIDR="$DNS_VNET_PREFIX.10.0/28"
+VM_DNS_PRIV_IP="$DNS_VNET_PREFIX.10.4/32"
 
 ## Public IP Name
 VM_DNS_PUBLIC_IP_NAME="dnssrvpip"

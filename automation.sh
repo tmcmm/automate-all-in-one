@@ -43,7 +43,7 @@ EOF
 # Variable definition
 SCRIPT_PATH="$( cd "$(dirname "$0")" ; pwd -P )"
 SCRIPT_NAME="$(echo $0 | sed 's|\.\/||g')"
-SCRIPT_VERSION="Version v1.0 20220204"
+SCRIPT_VERSION="Version v2.0 20230123"
 
 # Load parameters
 set -e
@@ -91,11 +91,12 @@ fi
 
 # az login check
 function az_login_check () {
-    if $(az account list 2>&1 | grep -q 'az login')
+  LOGIN=$(az group list -o table &>/dev/null; echo $?)
+  if [[ $LOGIN -ne 0 ]]
     then
-        echo -e "\n--> Warning: You have to login first with the 'az login' command before you can run this automation script\n"
-        az login -o table
-    fi
+      echo -e "\n--> Warning: You have to login first with the 'az login' command before you can run this automation script\n"
+      az login --use-device-code
+  fi
 }
 
 # Check k8s version exists on location
@@ -112,21 +113,27 @@ fi
 }
 
 function destroy() {
+  array=( kubenet cni private )
   echo -e "\n--> Warning: You are about to delete the whole environment\n"
-  AKS_GROUP_EXIST=$(az group show -g $AKS_RG_NAME &>/dev/null; echo $?)
-  VM_GROUP_EXIST=$(az group show -g $LINUX_VM_RG &>/dev/null; echo $?)
+  for i in ${array[@]}
+  do
+        PURPOSE=$i
+        AKS_GROUP_EXIST=$(az group show -g $AKS_RG_NAME-$PURPOSE &>/dev/null; echo $?)
+        VM_GROUP_EXIST=$(az group show -g  $LINUX_VM_RG-$PURPOSE &>/dev/null; echo $?)
   if [[ $AKS_GROUP_EXIST -eq 0 ]]
    then
-      echo -e "\n--> Warning: Deleting $AKS_RG_NAME resource group ...\n"
-      az group delete --name $AKS_RG_NAME
+      echo -e "\n--> Warning: Deleting $AKS_RG_NAME-$PURPOSE resource group ...\n"
+      az group delete --name $AKS_RG_NAME-$PURPOSE
   elif [[ $VM_GROUP_EXIST -eq 0 ]]
    then
-      echo -e "\n--> Warning: Deleting $LINUX_VM_RG resource group ...\n"
-      az group delete --name $LINUX_VM_RG
-      exit 5
+      echo -e "\n--> Warning: Deleting $LINUX_VM_RG-$PURPOSE resource group ...\n"
+      az group delete --name $LINUX_VM_RG-$PURPOSE
    else
-   echo -e "\n--> Info: Resource Groups $AKS_RG_NAME OR $LINUX_VM_RG don't exist in this subscription ...\n"
+   echo -e "\n--> Info: Resource Groups $AKS_RG_NAME-$PURPOSE OR $LINUX_VM_RG-$PURPOSE don't exist in this subscription ...\n"
   fi
+        echo "Deleted $i cluster resources if it existed"
+  done
+  
   
 }
 
@@ -552,7 +559,7 @@ else
 fi
 
 
-if [[ "$AKS_HAS_JUMP_SERVER" == "1" ]] 
+if [[ "$AKS_CREATE_JUMP_SERVER" == "1" ]] 
 then
 
   ## VM Jump Client subnet Creation
@@ -561,9 +568,8 @@ then
     --resource-group $AKS_RG_NAME \
     --vnet-name $AKS_VNET \
     --name $LINUX_VM_SUBNET_NAME \
-    --address-prefixes $LINUX_VM_SNET_CIDR \
+    --address-prefixes $LINUX_VM_SNET_CIDR_CNI \
     --debug
-  
   
   ## VM NSG Create
   echo "Create NSG"
@@ -579,12 +585,11 @@ then
     --resource-group $AKS_RG_NAME \
     --debug
   
-  
   ## VM Nic Create
   echo "Create VM Nic"
   az network nic create \
     --resource-group $AKS_RG_NAME \
-    --vnet-name $LINUX_VNET_NAME \
+    --vnet-name $AKS_VNET \
     --subnet $LINUX_VM_SUBNET_NAME \
     --name $LINUX_VM_NIC_NAME \
     --network-security-group $LINUX_VM_NSG_NAME \
@@ -626,8 +631,8 @@ then
     --tags $LINUX_TAGS \
     --debug
   
-  echo "Sleeping 45s - Allow time for Public IP"
-  sleep 45
+  echo "Sleeping 30s - Allow time for Public IP"
+  countdown "00:00:30"
   
   ## Output Public IP of VM
   echo "Getting Public IP of VM"
@@ -646,7 +651,7 @@ then
     --priority 100 \
     --source-address-prefixes $MY_HOME_PUBLIC_IP \
     --source-port-ranges '*' \
-    --destination-address-prefixes $LINUX_VM_PRIV_IP \
+    --destination-address-prefixes $LINUX_VM_PRIV_IP_CNI \
     --destination-port-ranges 22 \
     --access Allow \
     --protocol Tcp \
@@ -699,7 +704,7 @@ then
   echo "Add Kubectl completion"
   ssh -i $SSH_PRIV_KEY $GENERIC_ADMIN_USERNAME@$VM_PUBLIC_IP "source <(kubectl completion bash)"
 
-  ## Add Win password
+  ## Save Windows Password
   echo "Add Win password"
   ssh -i $SSH_PRIV_KEY $GENERIC_ADMIN_USERNAME@$VM_PUBLIC_IP "touch ~/win-pass.txt && echo "$WINDOWS_AKS_ADMIN_PASSWORD" > ~/win-pass.txt"
   
@@ -718,6 +723,7 @@ fi
 echo "Getting Cluster Credentials"
 az aks get-credentials --resource-group $AKS_RG_NAME --name $AKS_CLUSTER_NAME --overwrite-existing
 }
+
 function private_cluster () {
 AKS_RG_NAME=$AKS_RG_NAME-$PURPOSE
 AKS_CLUSTER_NAME=$AKS_CLUSTER_NAME-$PURPOSE
@@ -1166,7 +1172,7 @@ then
     --subnet-prefix $LINUX_VM_SNET_CIDR \
     --debug
 
-  
+  echo $LINUX_VM_NSG_NAME
   ## VM NSG Create
   echo "Create NSG"
   az network nsg create \
@@ -1196,7 +1202,7 @@ then
   ## Attache Public IP to VM NIC
   echo "Attach Public IP to VM NIC"
   az network nic ip-config update \
-    --name $LJ_DEFAULT_IP_CONFIG \
+    --name $LINUX_VM_DEFAULT_IP_CONFIG \
     --nic-name $LINUX_VM_NIC_NAME \
     --resource-group $LINUX_VM_RG \
     --public-ip-address $LINUX_VM_PUBLIC_IP_NAME \
@@ -1215,7 +1221,7 @@ then
   echo "Create VM"
   az vm create \
     --resource-group $LINUX_VM_RG \
-    --authentication-type $LJ_AUTH_TYPE \
+    --authentication-type $LINUX_AUTH_TYPE \
     --name $LINUX_VM_NAME \
     --computer-name $LINUX_VM_INTERNAL_NAME \
     --image $LINUX_VM_IMAGE \
@@ -1461,8 +1467,8 @@ az vm create \
   --tags $VM_TAGS \
   --debug
 
-echo "Sleeping 45s - Allow time for Public IP"
-sleep 45
+echo "Sleeping 30s - Allow time for Public IP"
+  countdown "00:00:30"
 
 ## Output Public IP of VM
 echo "Public IP of VM is:"
@@ -1477,7 +1483,7 @@ az network nsg rule create \
   --resource-group $MAIN_VNET_RG \
   --name ssh_allow \
   --priority 100 \
-  --source-address-prefixes $VM_MY_ISP_IP \
+  --source-address-prefixes $MY_HOME_PUBLIC_IP \
   --source-port-ranges '*' \
   --destination-address-prefixes $VM_DNS_PRIV_IP \
   --destination-port-ranges 22 \
@@ -1500,6 +1506,7 @@ done
 
 echo "Goood to go with Input Key Fingerprint"
 ssh-keygen -F $VM_PUBLIC_IP >/dev/null | ssh-keyscan -H $VM_PUBLIC_IP >> ~/.ssh/known_hosts
+
 
 }
 
@@ -1646,105 +1653,198 @@ az vm create \
   ssh -i $LINUX_SSH_PRIV_KEY $GENERIC_ADMIN_USERNAME@$LINUX_VM_PUBLIC_IP
 }
 
-function windows_subnet(){
-# Windows Jump Server Public IP Create
-echo "Create Public IP - Windows"
-az network public-ip create \
-  --name $WINDOWS_JS_PUBLIC_IP_NAME \
-  --resource-group $RG_NAME \
-  --debug
+function list_aks() {
+function printTable(){
+    local -r delimiter="${1}"
+    local -r data="$(removeEmptyLines "${2}")"
 
-echo "Create Windows Jump Server NSG"
-az network nsg create \
-  --resource-group $RG_NAME \
-  --name $WINDOWS_JS_NSG_NAME \
-  --debug
-## Windows VM Nic Create
-echo "Create Windows VM Nic"
-az network nic create \
-  --resource-group $RG_NAME \
-  --vnet-name $VNET_NAME \
-  --subnet $VM_SUBNET_NAME \
-  --name $WINDOWS_JS_NIC_NAME \
-  --network-security-group $WINDOWS_JS_NSG_NAME \
-  --debug
+    if [[ "${delimiter}" != '' && "$(isEmptyString "${data}")" = 'false' ]]
+    then
+        local -r numberOfLines="$(wc -l <<< "${data}")"
 
-## Update NSG in Windows VM Subnet
-echo "Update NSG in VM Subnet"
-az network vnet subnet update \
-  --resource-group $RG_NAME \
-  --name $VM_SUBNET_NAME \
-  --vnet-name $VNET_NAME \
-  --network-security-group $WINDOWS_JS_NSG_NAME \
-  --debug
+        if [[ "${numberOfLines}" -gt '0' ]]
+        then
+            local table=''
+            local i=1
 
-### Windows Create VM
-echo "Create Windows VM"
-az vm create \
-  --resource-group $RG_NAME \
-  --name $WINDOWS_JS_NAME \
-  --image $WINDOWS_JS_IMAGE \
-  --admin-username $GENERIC_ADMIN_USERNAME \
-  --admin-password $WINDOWS_AKS_ADMIN_PASSWORD \
-  --nics $WINDOWS_JS_NIC_NAME \
-  --tags $WINDOWS_JS_TAGS \
-  --computer-name $WINDOWS_JS_INTERNAL_NAME \
-  --authentication-type password \
-  --size $WINDOWS_JS_SIZE \
-  --storage-sku $WINDOWS_JS_STORAGE_SKU \
-  --os-disk-size-gb $WINDOWS_JS_OS_DISK_SIZE \
-  --os-disk-name $WINDOWS_JS_OS_DISK_NAME \
-  --nsg-rule NONE \
-  --debug
+            for ((i = 1; i <= "${numberOfLines}"; i = i + 1))
+            do
+                local line=''
+                line="$(sed "${i}q;d" <<< "${data}")"
+
+                local numberOfColumns='0'
+                numberOfColumns="$(awk -F "${delimiter}" '{print NF}' <<< "${line}")"
+
+                # Add Line Delimiter
+
+                if [[ "${i}" -eq '1' ]]
+                then
+                    table="${table}$(printf '%s#+' "$(repeatString '#+' "${numberOfColumns}")")"
+                fi
+
+                # Add Header Or Body
+
+                table="${table}\n"
+
+                local j=1
+
+                for ((j = 1; j <= "${numberOfColumns}"; j = j + 1))
+                do
+                    table="${table}$(printf '#| %s' "$(cut -d "${delimiter}" -f "${j}" <<< "${line}")")"
+                done
+
+                table="${table}#|\n"
+
+                # Add Line Delimiter
+
+                if [[ "${i}" -eq '1' ]] || [[ "${numberOfLines}" -gt '1' && "${i}" -eq "${numberOfLines}" ]]
+                then
+                    table="${table}$(printf '%s#+' "$(repeatString '#+' "${numberOfColumns}")")"
+                fi
+            done
+
+            if [[ "$(isEmptyString "${table}")" = 'false' ]]
+            then
+                echo -e "${table}" | column -s '#' -t | sed 's/^  //' | awk '/^\+/{gsub(" ", "-", $0)}1'
+           fi
+        fi
+    fi
+}
+
+function removeEmptyLines()
+{
+    local -r content="${1}"
+
+    echo -e "${content}" | sed '/^\s*$/d'
+}
+
+function repeatString()
+{
+    local -r string="${1}"
+    local -r numberToRepeat="${2}"
+
+    if [[ "${string}" != '' && "${numberToRepeat}" =~ ^[1-9][0-9]*$ ]]
+    then
+        local -r result="$(printf "%${numberToRepeat}s")"
+        echo -e "${result// /${string}}"
+    fi
+}
+
+function isEmptyString()
+{
+    local -r string="${1}"
+
+    if [[ "$(trimString "${string}")" = '' ]]
+    then
+        echo 'true' && return 0
+    fi
+
+    echo 'false' && return 1
+}
+
+function trimString()
+{
+    local -r string="${1}"
+
+    sed 's,^[[:blank:]]*,,' <<< "${string}" | sed 's,[[:blank:]]*$,,'
+}
 
 
-# Getting Public IP of Windows JS VM
-echo "Getting Public IP of Windows JS VM"
-WINDOWS_JS_AZ_PUBLIC_IP=$(az network public-ip list \
-  --resource-group $RG_NAME \
-  --output json | jq --arg pip $WINDOWS_JS_PUBLIC_IP_NAME -r '.[] | select( .name == $pip ) | [ .ipAddress ] | @tsv')
 
-PROCESS_NSG_FOR_LINUX_VM="true"
-TIME=$SECONDS
+AKS_ARRAY=($(az aks list --output json | jq -r ".[] | [ .name, .location, .resourceGroup, .kubernetesVersion, .provisioningState, .azurePortalFqdn ] | @csv"))
 
-## Get Priv IP of Windows JS VM
-echo "Getting Windows JS VM Priv IP"
-WINDOWS_JS_PRIV_IP=$(az vm list-ip-addresses --resource-group $RG_NAME --name $WINDOWS_JS_NAME --output json | jq -r ".[] | [ .virtualMachine.network.privateIpAddresses[0] ] | @tsv")
+declare -a AKS_STATUS_ARRAY
+AKS_STATUS_ARRAY=("ClusterName,Location,RG,K8SVersion,Status,FQDN")
 
+for akscl in "${AKS_ARRAY[@]}"; do
+     AKS_CL_ARRAY=($(echo $akscl | tr -d '"' |tr "," "\n"))
+     
+     ## Get Cluster Status
+     AKS_STATUS=$(az aks show --name ${AKS_CL_ARRAY[0]} --resource-group ${AKS_CL_ARRAY[2]} -o json | jq -r '.powerState.code')
 
-## Allow RDC from my Home to Windows JS VM
-echo "Update Windows JS VM NSG to allow RDP"
-az network nsg rule create \
-  --nsg-name $WINDOWS_JS_NSG_NAME \
-  --resource-group $RG_NAME \
-  --name rdc_allow \
-  --priority 100 \
-  --source-address-prefixes $MY_HOME_PUBLIC_IP \
-  --source-port-ranges '*' \
-  --destination-address-prefixes $WINDOWS_JS_PRIV_IP \
-  --destination-port-ranges 3389 \
-  --access Allow \
-  --protocol Tcp \
-  --description "Allow from MY ISP IP"
+     AKS_STATUS_ARRAY+=("${AKS_CL_ARRAY[0]},${AKS_CL_ARRAY[1]},${AKS_CL_ARRAY[2]},${AKS_CL_ARRAY[3]},$AKS_STATUS,${AKS_CL_ARRAY[5]}")
+done
 
+clear
+for i in "${AKS_STATUS_ARRAY[@]}"
+do
+   AKS_STATUS_LIST+=$i"\n"
+done
 
-echo ""
-echo "Windows JS VM Public IP: $WINDOWS_JS_AZ_PUBLIC_IP"
+printTable ',' $AKS_STATUS_LIST
 
 }
 
-options=("Azure Cluster" "Kubenet Cluster" "Private Cluster" "Linux DNS VM" "Windows DNS VM" "Create Linux VM on Subnet" "Create Windows VM on Subnet" "Destroy Environment" "Quit")
+function helm_nginx (){
+
+echo -e "\n--> Warning: You must target a public faced cluster or run the script from the Jump Server in case its private\n"
+echo "What is the Resource Group of your Cluster:"
+read -e AKS_RG_NAME
+echo "What is the Cluster Name:"
+read -e AKS_CLUSTER_NAME
+
+## Get Credentials
+echo "Getting Cluster Credentials"
+az aks get-credentials --resource-group $AKS_RG_NAME --name $AKS_CLUSTER_NAME --overwrite-existing
+
+## Add the ingress-nginx repository
+echo "Add IngController Helm Repo"
+helm repo add ingress-nginx https://kubernetes.github.io/ingress-nginx
+
+## Install 
+echo "Install Nginx Ingress"
+helm install nginx-ingress ingress-nginx/ingress-nginx \
+    --namespace ingress-basic --create-namespace \
+    --set controller.replicaCount=2 \
+    --set controller.nodeSelector."kubernetes\.io/os"=linux \
+    --set controller.image.digest="" \
+    --set controller.admissionWebhooks.patch.nodeSelector."kubernetes\.io/os"=linux \
+    --set controller.admissionWebhooks.patch.image.digest="" \
+    --set defaultBackend.nodeSelector."kubernetes\.io/os"=linux \
+    --set defaultBackend.image.digest="" \
+    --set controller.service.annotations."service\.beta\.kubernetes\.io/azure-load-balancer-health-probe-request-path"=/healthz
+
+
+## Get PIP of LB
+echo "Get PIP of LB"
+LB_PIP=$(kubectl get svc -A -n nginx-ingress-ingress-nginx-controller --no-headers -o json | jq -r '.items[].status.loadBalancer.ingress[]?.ip' | wc -l)
+
+while [[ "$LB_PIP" = "0" ]]
+do
+    echo "not good to go: $LB_PIP"
+    echo "Sleeping for 5s..."
+    sleep 5
+    LB_PIP=$(kubectl get svc -A -n nginx-ingress-ingress-nginx-controller --no-headers -o json | jq -r '.items[].status.loadBalancer.ingress[]?.ip' | wc -l)
+done
+
+echo "Go to go with LB PIP"
+LB_PIP=$(kubectl get svc -A -n nginx-ingress-ingress-nginx-controller --no-headers -o json | jq -r '.items[].status.loadBalancer.ingress[]?.ip')
+echo "LB PIP is: $LB_PIP"
+
+## Deploy Apps
+echo "App 01"
+kubectl apply -f app-01.yaml -n ingress-basic
+echo ""
+echo "App 02"
+kubectl apply -f app-02.yaml -n ingress-basic
+echo "Deploy AKS App Ingress Controller"
+kubectl apply -f app-ingress.yaml --namespace ingress-basic
+
+
+}
+
+options=("Azure Cluster" "Kubenet Cluster" "Private Cluster" "List existing AKS Clusters" "Create Linux VM on Subnet" "Linux DNS VM" "Helm Nginx Ingress Controller" "Destroy Environment" "Quit")
 select opt in "${options[@]}"
 do    
 	case $opt in
-        "Azure Cluster")
+      "Azure Cluster")
         az_login_check
         check_k8s_version
         sleep 2
         PURPOSE="cni"
         azure_cluster
         break;;
-        "Kubenet Cluster")
+      "Kubenet Cluster")
         az_login_check
         PURPOSE="kubenet"
         AKS_CNI_PLUGIN="kubenet"
@@ -1759,30 +1859,31 @@ do
         sleep 2
         private_cluster
         break;;
-        "Linux DNS VM")
+	    "List existing AKS Clusters")
         az_login_check
-        linux_dns
+        sleep 2
+        list_aks
         break;;
-	      "Windows DNS VM")
-        
-        break;;
-	      "Create Linux VM on Subnet")
+      "Create Linux VM on Subnet")
         az_login_check
         linux_subnet
         break;;
-        "Create Windows VM on Subnet")
+      "Linux DNS VM")
         az_login_check
-        windows_subnet
+        linux_dns
         break;;
-	      "Destroy Environment")
+	    "Helm Nginx Ingress Controller")
         az_login_check
-        echo ""
+        helm_nginx
+        break;;
+	    "Destroy Environment")
+        az_login_check
         destroy
         break;;
         "Quit")
          exit 0
             break
             ;;
-        *) echo "Invalid Optiona $REPLY";;
+        *) echo "Invalid Option $REPLY";;
     esac
 done
