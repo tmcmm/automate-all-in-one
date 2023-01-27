@@ -105,7 +105,7 @@ echo -e "\n--> Creating ${PURPOSE} cluster with Kubernetes version ${AKS_VERSION
 if [ $VERSION_EXIST -ne 0 ]
 then
     echo -e "\n--> Kubernetes version ${AKS_VERSION} does not exist on location ${AKS_RG_LOCATION}...\n"
-    echo -e "\n--> Kubernetes version available version on ${AKS_VERSION} are:\n"
+    echo -e "\n--> Kubernetes version available on ${AKS_RG_LOCATION} location are:\n"
     az aks get-versions -l $AKS_RG_LOCATION -o table
     exit 0
 fi
