@@ -1976,9 +1976,9 @@ do
 	case $opt in
       "Azure Cluster")
         az_login_check
+        PURPOSE="cni"
         check_k8s_version
         sleep 2
-        PURPOSE="cni"
         azure_cluster
         break;;
       "Kubenet Cluster")
