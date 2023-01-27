@@ -1381,90 +1381,82 @@ az aks get-credentials \
 
 linux_dns () {
 
-echo "On which Resource Group you want to install the DNS server"
-read -e DNS_RG_NAME
+echo "On which Resource Group does your AKS VNET is:"
+read -e AKS_RG_NAME
 
-## Create Resource Group for DNS Server
-echo "Create RG for DNS Server"
-az group create \
-  --name $DNS_RG_NAME \
-  --location $DNS_RG_LOCATION \
-  --tags env=dns \
-  --debug
+echo "What is the Cluster Name:"
+read -e AKS_CLUSTER_NAME
+
+echo "What is the VNET Name of your AKS:"
+read -e AKS_VNET_NAME
 
 ## VM DNS Server Subnet Creation
 echo "Create VM DNS Server Subnet"
 az network vnet subnet create \
-  --resource-group $DNS_RG_NAME \
-  --vnet-name $DNS_VNET_NAME \
+  --resource-group $AKS_RG_NAME \
+  --vnet-name $AKS_VNET_NAME \
   --name $VM_DNS_SUBNET_NAME \
   --address-prefixes $VM_DNS_SNET_CIDR \
   --debug
 
-
 ## VM NSG Create
 echo "Create NSG"
 az network nsg create \
-  --resource-group $MAIN_VNET_RG \
-  --name $VM_NSG_NAME \
+  --resource-group $AKS_RG_NAME \
+  --name $DNS_NSG_NAME \
   --debug
-
 
 ## Public IP Create
 echo "Create Public IP"
 az network public-ip create \
   --name $VM_DNS_PUBLIC_IP_NAME \
-  --resource-group $MAIN_VNET_RG \
+  --resource-group $AKS_RG_NAME \
   --debug
-
 
 ## VM Nic Create
 echo "Create VM Nic"
 az network nic create \
-  --resource-group $MAIN_VNET_RG \
-  --vnet-name $MAIN_VNET_NAME \
+  --resource-group $AKS_RG_NAME \
+  --vnet-name $AKS_VNET_NAME \
   --subnet $VM_DNS_SUBNET_NAME \
-  --name $VM_NIC_NAME \
-  --network-security-group $VM_NSG_NAME \
+  --name $DNS_NIC_NAME \
+  --network-security-group $DNS_NSG_NAME \
   --debug 
-
 
 ## Attach Public IP to VM NIC
 echo "Attach Public IP to VM NIC"
 az network nic ip-config update \
   --name $VM_DNS_DEFAULT_IP_CONFIG \
-  --nic-name $VM_NIC_NAME \
-  --resource-group $MAIN_VNET_RG \
+  --nic-name $DNS_NIC_NAME \
+  --resource-group $AKS_RG_NAME \
   --public-ip-address $VM_DNS_PUBLIC_IP_NAME \
   --debug
-
 
 ## Update NSG in VM Subnet
 echo "Update NSG in VM Subnet"
 az network vnet subnet update \
-  --resource-group $MAIN_VNET_RG \
+  --resource-group $AKS_RG_NAME \
   --name $VM_DNS_SUBNET_NAME \
-  --vnet-name $MAIN_VNET_NAME \
-  --network-security-group $VM_NSG_NAME \
+  --vnet-name $AKS_VNET_NAME \
+  --network-security-group $DNS_NSG_NAME \
   --debug
-
 
 ## Create VM
 echo "Create VM"
 az vm create \
-  --resource-group $MAIN_VNET_RG \
-  --authentication-type $VM_AUTH_TYPE \
-  --name $VM_NAME \
-  --computer-name $VM_INTERNAL_NAME \
-  --image $VM_IMAGE \
-  --size $VM_SIZE \
+  --resource-group $AKS_RG_NAME \
+  --authentication-type $LINUX_AUTH_TYPE \
+  --name $DNS_VM_NAME \
+  --computer-name $DNS_INTERNAL_VM_NAME \
+  --image $LINUX_VM_IMAGE \
+  --size $LINUX_VM_SIZE \
   --admin-username $GENERIC_ADMIN_USERNAME \
   --ssh-key-values $ADMIN_USERNAME_SSH_KEYS_PUB \
-  --storage-sku $VM_STORAGE_SKU \
-  --os-disk-size-gb $VM_OS_DISK_SIZE \
-  --os-disk-name $VM_OS_DISK_NAME \
-  --nics $VM_NIC_NAME \
-  --tags $VM_TAGS \
+  --storage-sku $LINUX_VM_STORAGE_SKU \
+  --os-disk-size-gb $LINUX_VM_OS_DISK_SIZE \
+  --os-disk-name $DNS_VM_OS_DISK_NAME \
+  --nics $DNS_NIC_NAME \
+  --tags $DNS_VM_TAGS \
   --debug
 
 echo "Sleeping 30s - Allow time for Public IP"
@@ -1472,15 +1464,15 @@ echo "Sleeping 30s - Allow time for Public IP"
 
 ## Output Public IP of VM
 echo "Public IP of VM is:"
-VM_PUBLIC_IP=$(az network public-ip list \
-  --resource-group $MAIN_VNET_RG \
+DNS_VM_PUBLIC_IP=$(az network public-ip list \
+  --resource-group $AKS_RG_NAME \
   --output json | jq -r ".[] | select (.name==\"$VM_DNS_PUBLIC_IP_NAME\") | [ .ipAddress] | @tsv")
 
 ## Allow SSH from local ISP
 echo "Update VM NSG to allow SSH"
 az network nsg rule create \
-  --nsg-name $VM_NSG_NAME \
-  --resource-group $MAIN_VNET_RG \
+  --nsg-name $DNS_NSG_NAME \
+  --resource-group $AKS_RG_NAME \
   --name ssh_allow \
   --priority 100 \
   --source-address-prefixes $MY_HOME_PUBLIC_IP \
@@ -1491,22 +1483,168 @@ az network nsg rule create \
   --protocol Tcp \
   --description "Allow from MY ISP IP"
 
-
 ## Input Key Fingerprint
 echo "Input Key Fingerprint" 
-FINGER_PRINT_CHECK=$(ssh-keygen -F $VM_PUBLIC_IP >/dev/null | ssh-keyscan -H $VM_PUBLIC_IP | wc -l)
+FINGER_PRINT_CHECK=$(ssh-keygen -F $DNS_VM_PUBLIC_IP >/dev/null | ssh-keyscan -H $DNS_VM_PUBLIC_IP | wc -l)
 
 while [[ "$FINGER_PRINT_CHECK" = "0" ]]
 do
     echo "not good to go: $FINGER_PRINT_CHECK"
     echo "Sleeping for 5s..."
     sleep 5
-    FINGER_PRINT_CHECK=$(ssh-keygen -F $VM_PUBLIC_IP >/dev/null | ssh-keyscan -H $VM_PUBLIC_IP | wc -l)
+    FINGER_PRINT_CHECK=$(ssh-keygen -F $DNS_VM_PUBLIC_IP >/dev/null | ssh-keyscan -H $DNS_VM_PUBLIC_IP | wc -l)
 done
 
 echo "Goood to go with Input Key Fingerprint"
-ssh-keygen -F $VM_PUBLIC_IP >/dev/null | ssh-keyscan -H $VM_PUBLIC_IP >> ~/.ssh/known_hosts
+ssh-keygen -F $DNS_VM_PUBLIC_IP >/dev/null | ssh-keyscan -H $DNS_VM_PUBLIC_IP >> ~/.ssh/known_hosts
 
+
+BIND_CONFIG_FILE_NAME="named.conf.options"
+
+echo "Cleaning up Bind Config File"
+rm -rf $BIND_CONFIG_FILE_NAME
+
+
+echo "Write to Bind Config File "
+printf "
+logging {
+          channel "misc" {
+                    file \"/var/log/named/misc.log\" versions 4 size 4m;
+                    print-time YES;
+                    print-severity YES;
+                    print-category YES;
+          };
+  
+          channel "query" {
+                    file \"/var/log/named/query.log\" versions 4 size 4m;
+                    print-time YES;
+                    print-severity NO;
+                    print-category NO;
+          };
+  
+          category default {
+                    "misc";
+          };
+  
+          category queries {
+                    "query";
+          };
+};
+
+
+acl goodclients {
+    localhost;
+    $AKS_SNET_CIDR;
+};
+
+options {
+        directory \"/var/cache/bind\";
+
+        forwarders {
+                $VM_BIND_FORWARDERS_01;
+                $VM_BIND_FORWARDERS_02;
+        };
+
+        recursion yes;
+
+        allow-query { goodclients; };
+
+        dnssec-validation auto;
+
+        auth-nxdomain no;    # conform to RFC1035
+        listen-on-v6 { any; };
+};
+" >> $BIND_CONFIG_FILE_NAME
+
+
+
+## Update DNS Server VM
+echo "Update DNS Server VM and Install Bind9"
+ssh -i $SSH_PRIV_KEY $GENERIC_ADMIN_USERNAME@$DNS_VM_PUBLIC_IP "sudo apt update && sudo apt upgrade -y"
+
+## Install Bind9
+echo "Install Bind9"
+ssh -i $SSH_PRIV_KEY $GENERIC_ADMIN_USERNAME@$DNS_VM_PUBLIC_IP "sudo apt install vim bind9 -y"
+
+## Setup Bind9
+echo "Setup Bind9"
+ssh -i $SSH_PRIV_KEY $GENERIC_ADMIN_USERNAME@$DNS_VM_PUBLIC_IP "sudo cp /etc/bind/named.conf.options /etc/bind/named.conf.options.backup"
+
+## Create Bind9 Logs folder
+echo "Create Bind9 Logs folder"
+ssh -i $SSH_PRIV_KEY $GENERIC_ADMIN_USERNAME@$DNS_VM_PUBLIC_IP "sudo mkdir /var/log/named"
+
+## Setup good permission in Bind9 Logs folder - change owner
+echo "Setup good permission in Bind9 Logs folder - change owner"
+ssh -i $SSH_PRIV_KEY $GENERIC_ADMIN_USERNAME@$DNS_VM_PUBLIC_IP "sudo chown -R bind:bind /var/log/named"
+
+## Setup good permission in Bind9 Logs folder - change permissions
+echo "Setup good permission in Bind9 Logs folder - change permissions"
+ssh -i $SSH_PRIV_KEY $GENERIC_ADMIN_USERNAME@$DNS_VM_PUBLIC_IP "sudo chmod -R 775 /var/log/named"
+
+## Copy Bind Config file to DNS Server
+echo "Copy Bind Config File to Remote DNS server"
+scp -i $SSH_PRIV_KEY $BIND_CONFIG_FILE_NAME $GENERIC_ADMIN_USERNAME@$DNS_VM_PUBLIC_IP:/tmp
+
+## sudo cp options file to /etc/bind/
+echo "Copy the Bind File to /etc/bind"
+ssh -i $SSH_PRIV_KEY $GENERIC_ADMIN_USERNAME@$DNS_VM_PUBLIC_IP "sudo cp /tmp/$BIND_CONFIG_FILE_NAME /etc/bind"
+
+## sudo systemctl stop bind9
+echo "Stop Bind9"
+ssh -i $SSH_PRIV_KEY $GENERIC_ADMIN_USERNAME@$DNS_VM_PUBLIC_IP "sudo systemctl stop bind9"
+
+## sudo systemctl start bind9
+echo "Start Bind9"
+ssh -i $SSH_PRIV_KEY $GENERIC_ADMIN_USERNAME@$DNS_VM_PUBLIC_IP "sudo systemctl start bind9"
+
+
+CORE_DNS_CONFIGMAP="configmap.yaml"
+
+echo "Cleaning up Bind Config File"
+rm -rf $CORE_DNS_CONFIGMAP
+
+echo "Write to Bind Config File "
+printf "
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: coredns-custom
+  namespace: kube-system
+data:
+  azure.server: | 
+    com:53 {
+        log
+        errors
+        cache 30
+        forward . 168.63.129.16
+    }
+  byodnspt.server: | 
+    pt:53 {
+        log
+        errors
+        cache 15
+        forward . $VM_DNS_PRIV_IP
+    }
+  byodnsio.server: | 
+    io:53 {
+        log 
+        errors
+        cache 15
+        forward . $VM_DNS_PRIV_IP
+    }   
+" >> $CORE_DNS_CONFIGMAP
+
+## Get Credentials
+echo "Getting Cluster Credentials"
+az aks get-credentials --resource-group $AKS_RG_NAME --name $AKS_CLUSTER_NAME --overwrite-existing
+
+echo "Apply CoreDNS ConfigMap"
+kubectl apply -f $CORE_DNS_CONFIGMAP 
+
+## Re-deploy CoreDNS pods 
+echo "Re-deploy CoreDNS pods"
+kubectl rollout restart -n kube-system deployment/coredns
 
 }
 
@@ -1629,7 +1767,7 @@ az vm create \
 
   ## VM Install software
   echo "VM Install software"
-  ssh -i $LINUX_SSH_PRIV_KEY $GENERIC_ADMIN_USERNAME@$LINUX_VM_PUBLIC_IP sudo apt install tcpdump wget snap dnsutils -y
+  ssh -i $LINUX_SSH_PRIV_KEY $GENERIC_ADMIN_USERNAME@$LINUX_VM_PUBLIC_IP "sudo apt install tcpdump wget snap dnsutils -y"
 
   ## Add Az Cli
   echo "Add Az Cli"
@@ -1637,11 +1775,11 @@ az vm create \
 
   ## Install Kubectl
   echo "Install Kubectl"
-  ssh -i $LINUX_SSH_PRIV_KEY $GENERIC_ADMIN_USERNAME@$LINUX_VM_PUBLIC_IP sudo snap install kubectl --classic
+  ssh -i $LINUX_SSH_PRIV_KEY $GENERIC_ADMIN_USERNAME@$LINUX_VM_PUBLIC_IP "sudo snap install kubectl --classic"
 
   ## Install JQ
   echo "Install JQ"
-  ssh -i $LINUX_SSH_PRIV_KEY $GENERIC_ADMIN_USERNAME@$LINUX_VM_PUBLIC_IP sudo snap install jq
+  ssh -i $LINUX_SSH_PRIV_KEY $GENERIC_ADMIN_USERNAME@$LINUX_VM_PUBLIC_IP "sudo snap install jq"
 
   ## Add Kubectl completion
   echo "Add Kubectl completion"

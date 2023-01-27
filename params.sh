@@ -41,6 +41,7 @@ AKS_USR_NP_NODE_DISK_SIZE="100"
 AKS_NP_VM_TYPE="VirtualMachineScaleSets"
 AKS_MAX_PODS_PER_NODE="30"
 ADMIN_USERNAME_SSH_KEYS_PUB=/home/$USER/.ssh/id_rsa.pub
+SSH_PRIV_KEY=/home/$USER/.ssh/id_rsa
 GENERIC_ADMIN_USERNAME="azureuser"
 
 # OS SKU
@@ -94,23 +95,11 @@ LINUX_TAGS="env=kubernetes"
 
 
 ## DNS Parameters
-DNS_RG_LOCATION="westeurope"
-DNS_VNET_NAME="dns-vnet"
 VM_DNS_SUBNET_NAME="dns-subnet"
 
 ## Running Options
 JUST_BIND="0"              # 1 - If we just want to deploy Bind server
 ALL="1"                    # 1 - If we want to deploy all, VM + Bind
-DNS_VNET_PREFIX="10.3"     # Having in mind Vnet Peering, we need to make sure no Vnet overlaps
-AKS_NAME="bcc"
-
-## Core Networking
-MAIN_VNET_RG="rg-aks-$AKS_NAME"
-MAIN_VNET_NAME="vnet-aks-$AKS_NAME"
-MAIN_VNET_LOCATION="westeurope"
-
-## AKS SubNet details
-AKS_SUBNET_CIDR="$DNS_VNET_PREFIX.0.0/23"
 
 ## Bind9 Forwarders
 VM_BIND_FORWARDERS_01="168.63.129.16"
@@ -118,28 +107,22 @@ VM_BIND_FORWARDERS_02="1.1.1.1"
 
 ## VM Specific Networking
 VM_DNS_SUBNET_NAME="snet-dns-server"
-VM_DNS_SNET_CIDR="$DNS_VNET_PREFIX.10.0/28"
-VM_DNS_PRIV_IP="$DNS_VNET_PREFIX.10.4/32"
+VM_DNS_SNET_CIDR="$AKS_VNET_2_OCTETS.7.0/28"
+VM_DNS_PRIV_IP="$AKS_VNET_2_OCTETS.7.4"
 
-## Public IP Name
-VM_DNS_PUBLIC_IP_NAME="dnssrvpip"
-VM_DNS_DEFAULT_IP_CONFIG="ipconfig1"
+
 
 ## VM SSH Client
-VM_RG_LOCATION=$MAIN_VNET_LOCATION
-VM_AUTH_TYPE="ssh"
-VM_NAME="dns-srv"
-VM_INTERNAL_NAME="dns-srv"
-VM_IMAGE_PROVIDER="Canonical"
-VM_IMAGE_OFFER="UbuntuServer"
-VM_IMAGE_SKU="18.04-LTS"
-VM_IMAGE_VERSION="latest"
-VM_IMAGE="$VM_IMAGE_PROVIDER:$VM_IMAGE_OFFER:$VM_IMAGE_SKU:$VM_IMAGE_VERSION"
-VM_PUBLIC_IP="" 
-VM_SIZE="Standard_D2s_v3"
-VM_STORAGE_SKU="Standard_LRS"
-VM_OS_DISK_SIZE="40"
-VM_OS_DISK_NAME="$VM_NAME""_disk_01"
-VM_NSG_NAME="$VM_NAME""_nsg"
-VM_NIC_NAME="$VM_NAME""nic01"
-VM_TAGS="purpose=dns-server"
+CONTEXT="dns"
+DNS_VM_NAME="virtualmachine"-$CONTEXT
+DNS_INTERNAL_VM_NAME="dns-internal"
+DNS_VM_TAGS="purpose=dns-server"
+DNS_NSG_NAME="$DNS_VM_NAME""-nsg"
+DNS_NIC_NAME="$DNS_VM_NAME""-nic01"
+DNS_VM_OS_DISK_NAME="$DNS_VM_NAME""-OSdisk"
+
+## Public IP Name
+VM_DNS_PUBLIC_IP_NAME="$DNS_VM_NAME""-pip"
+VM_DNS_DEFAULT_IP_CONFIG="ipconfig1"
+
+
