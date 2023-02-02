@@ -21,7 +21,7 @@ AKS_HAS_AUTO_SCALER="0"       # 1 = AKS has Auto Scaler enabled
 AKS_HAS_MANAGED_IDENTITY="1"  # 1 = AKS has Managed Identity enabled
 AKS_HAS_NETWORK_POLICY="0"    # 1 = AKS has Azure Net Pol enabled
 AKS_HAS_2ND_NODEPOOL="1"      # 1 = AKS has second npool
-AKS_CREATE_JUMP_SERVER="0"    # 1 = If we need to create a JS from Other Vnet 
+AKS_CREATE_JUMP_SERVER="1"    # 1 = If we need to create a JS from Other Vnet 
 AKS_HAS_JUMP_SERVER="0"       # 1 = If we already have a Jump Server from Other Vnet, with Peered Vnet 
 
 #########################################################################

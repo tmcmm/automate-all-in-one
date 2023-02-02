@@ -1342,7 +1342,7 @@ then
  
   ## VM Install software
   echo "VM Install software"
-  ssh -i $SSH_PRIV_KEY $GENERIC_ADMIN_USERNAME@$VM_PUBLIC_IP sudo apt install tcpdump wget snap dnsutils -y
+  ssh -i $SSH_PRIV_KEY $GENERIC_ADMIN_USERNAME@$VM_PUBLIC_IP "sudo apt install tcpdump wget snap dnsutils -y"
 
   ## Add Az Cli
   echo "Add Az Cli"
@@ -1350,11 +1350,11 @@ then
   
   ## Install Kubectl
   echo "Install Kubectl"
-  ssh -i $SSH_PRIV_KEY $GENERIC_ADMIN_USERNAME@$VM_PUBLIC_IP sudo snap install kubectl --classic
+  ssh -i $SSH_PRIV_KEY $GENERIC_ADMIN_USERNAME@$VM_PUBLIC_IP "sudo snap install kubectl --classic"
   
   ## Install JQ
   echo "Install JQ"
-  ssh -i $SSH_PRIV_KEY $GENERIC_ADMIN_USERNAME@$VM_PUBLIC_IP sudo snap install jq
+  ssh -i $SSH_PRIV_KEY $GENERIC_ADMIN_USERNAME@$VM_PUBLIC_IP "sudo snap install jq"
   
   ## Add Kubectl completion
   echo "Add Kubectl completion"
@@ -1363,18 +1363,16 @@ then
   ## Add Win password
   echo "Add Win password"
   ssh -i $SSH_PRIV_KEY $GENERIC_ADMIN_USERNAME@$VM_PUBLIC_IP "touch ~/win-pass.txt && echo "$WINDOWS_AKS_ADMIN_PASSWORD" > ~/win-pass.txt"
+
+  ## Get Credentials
+  echo "Add Kubectl completion"
+  ssh -i $SSH_PRIV_KEY $GENERIC_ADMIN_USERNAME@$VM_PUBLIC_IP "az aks get-credentials --resource-group $AKS_RG_NAME --name $AKS_CLUSTER_NAME"
   
   echo "Public IP of the VM"
   echo $VM_PUBLIC_IP
 
 fi
 
-## Get Credentials
-echo "Getting Cluster Credentials"
-az aks get-credentials \
-  --resource-group $AKS_RG_NAME \
-  --name $AKS_CLUSTER_NAME \
-  --overwrite-existing
 }
 
 
