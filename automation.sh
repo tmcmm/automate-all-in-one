@@ -21,6 +21,8 @@ printf "|`tput bold` %-40s `tput sgr0`|\n" "export ADMIN_USERNAME_SSH_KEYS_PUB"
 sleep 2
 showHelp() {
 cat << EOF  
+
+
 bash $SCRIPT_NAME --help/-h  [for help]
 bash $SCRIPT_NAME --version/-v  [for version]
 bash $SCRIPT_NAME -g/--group <aks-rg-name> -n/--name <aks-name> -k/--aks-version -l/--location 
