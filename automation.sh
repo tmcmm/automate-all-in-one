@@ -697,7 +697,11 @@ then
   echo "Install Kubectl"
   ssh -i $SSH_PRIV_KEY $GENERIC_ADMIN_USERNAME@$VM_PUBLIC_IP sudo snap install kubectl --classic
   
+## Install Helm
+  echo "Install Helm3"
+  ssh -i $LINUX_SSH_PRIV_KEY $GENERIC_ADMIN_USERNAME@$VM_PUBLIC_IP "curl https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3 | bash"
   ## Install JQ
+
   echo "Install JQ"
   ssh -i $SSH_PRIV_KEY $GENERIC_ADMIN_USERNAME@$VM_PUBLIC_IP sudo snap install jq
   
@@ -1354,6 +1358,10 @@ then
   echo "Install Kubectl"
   ssh -i $SSH_PRIV_KEY $GENERIC_ADMIN_USERNAME@$VM_PUBLIC_IP "sudo snap install kubectl --classic"
   
+  ## Install Helm
+  echo "Install Helm3"
+  ssh -i $LINUX_SSH_PRIV_KEY $GENERIC_ADMIN_USERNAME@$VM_PUBLIC_IP "curl https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3 | bash" 
+
   ## Install JQ
   echo "Install JQ"
   ssh -i $SSH_PRIV_KEY $GENERIC_ADMIN_USERNAME@$VM_PUBLIC_IP "sudo snap install jq"
@@ -1775,6 +1783,10 @@ az vm create \
   ## Install Kubectl
   echo "Install Kubectl"
   ssh -i $LINUX_SSH_PRIV_KEY $GENERIC_ADMIN_USERNAME@$LINUX_VM_PUBLIC_IP "sudo snap install kubectl --classic"
+  
+## Install Helm
+  echo "Install Helm3"
+  ssh -i $LINUX_SSH_PRIV_KEY $GENERIC_ADMIN_USERNAME@$LINUX_VM_PUBLIC_IP "curl https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3 | bash"
 
   ## Install JQ
   echo "Install JQ"
@@ -1915,6 +1927,8 @@ printTable ',' $AKS_STATUS_LIST
 function helm_nginx (){
 
 echo -e "\n--> Warning: You must target a public faced cluster or run the script from the Jump Server in case its private\n"
+echo -e "\n--> ......Installing Helm.....\n"
+curl https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3 | bash
 echo "What is the Resource Group of your Cluster:"
 read -e AKS_RG_NAME
 echo "What is the Cluster Name:"
