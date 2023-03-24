@@ -1,0 +1,48 @@
+
+logging {
+          channel misc {
+                    file "/var/log/bind9/misc.log" versions 4 size 4m;
+                    print-time YES;
+                    print-severity YES;
+                    print-category YES;
+          };
+  
+          channel query {
+                    file "/var/log/bind9/query.log" versions 4 size 4m;
+                    print-time YES;
+                    print-severity NO;
+                    print-category NO;
+          };
+  
+          category default {
+                    misc;
+          };
+  
+          category queries {
+                    query;
+          };
+};
+
+
+acl goodclients {
+    localhost;
+    10.4.0.0/23;
+};
+
+options {
+        directory "/var/cache/bind";
+
+        forwarders {
+                168.63.129.16;
+                1.1.1.1;
+        };
+
+        recursion yes;
+
+        allow-query { goodclients; };
+
+        dnssec-validation auto;
+
+        auth-nxdomain no;    # conform to RFC1035
+        listen-on-v6 { any; };
+};

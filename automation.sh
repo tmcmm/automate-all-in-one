@@ -1507,23 +1507,29 @@ ssh-keygen -F $DNS_VM_PUBLIC_IP >/dev/null | ssh-keyscan -H $DNS_VM_PUBLIC_IP >>
 
 
 BIND_CONFIG_FILE_NAME="named.conf.options"
+ZONE_NAME="mydomain.local"
+BIND_DNS_FILE_NAME="$ZONE_NAME.local.zone"
+ZONE_LOCAL_FILE="named.conf.local"
 
 echo "Cleaning up Bind Config File"
 rm -rf $BIND_CONFIG_FILE_NAME
+
+echo "Cleaning up Bind dns zone File"
+rm -rf $BIND_DNS_FILE_NAME
 
 
 echo "Write to Bind Config File "
 printf "
 logging {
           channel "misc" {
-                    file \"/var/log/named/misc.log\" versions 4 size 4m;
+                    file \"/var/log/bind9/misc.log\" versions 4 size 4m;
                     print-time YES;
                     print-severity YES;
                     print-category YES;
           };
   
           channel "query" {
-                    file \"/var/log/named/query.log\" versions 4 size 4m;
+                    file \"/var/log/bind9/query.log\" versions 4 size 4m;
                     print-time YES;
                     print-severity NO;
                     print-category NO;
@@ -1565,6 +1571,36 @@ options {
 
 
 
+echo "Write to Bind DNS Zone File "
+printf "
+'$'TTL 86400
+@       IN      SOA     ns1.$ZONE_NAME. admin.$ZONE_NAME. (
+                        $(date +%Y%m%d) ; Serial
+                        3600            ; Refresh
+                        1800            ; Retry
+                        604800          ; Expire
+                        86400           ; Minimum TTL
+                )
+
+@       IN      NS      ns1.$ZONE_NAME.
+@       IN      A       $VM_DNS_PRIV_IP
+www     IN      A       $VM_DNS_PRIV_IP
+"  >> $BIND_DNS_FILE_NAME
+
+echo "Write to local dns zone file "
+printf "
+// Do any local configuration here
+//
+
+// Consider adding the 1918 zones here, if they are not used in your
+// organization
+//include "/etc/bind/zones.rfc1918";
+zone $ZONE_NAME {
+    type master;
+    file $BIND_DNS_FILE_NAME;
+};
+"  >> $ZONE_LOCAL_FILE
+
 ## Update DNS Server VM
 echo "Update DNS Server VM and Install Bind9"
 ssh -i $SSH_PRIV_KEY $GENERIC_ADMIN_USERNAME@$DNS_VM_PUBLIC_IP "sudo apt update && sudo apt upgrade -y"
@@ -1579,15 +1615,15 @@ ssh -i $SSH_PRIV_KEY $GENERIC_ADMIN_USERNAME@$DNS_VM_PUBLIC_IP "sudo cp /etc/bin
 
 ## Create Bind9 Logs folder
 echo "Create Bind9 Logs folder"
-ssh -i $SSH_PRIV_KEY $GENERIC_ADMIN_USERNAME@$DNS_VM_PUBLIC_IP "sudo mkdir /var/log/named"
+ssh -i $SSH_PRIV_KEY $GENERIC_ADMIN_USERNAME@$DNS_VM_PUBLIC_IP "sudo mkdir /var/log/bind9"
 
 ## Setup good permission in Bind9 Logs folder - change owner
 echo "Setup good permission in Bind9 Logs folder - change owner"
-ssh -i $SSH_PRIV_KEY $GENERIC_ADMIN_USERNAME@$DNS_VM_PUBLIC_IP "sudo chown -R bind:bind /var/log/named"
+ssh -i $SSH_PRIV_KEY $GENERIC_ADMIN_USERNAME@$DNS_VM_PUBLIC_IP "sudo chown -R bind:bind /var/log/bind9"
 
 ## Setup good permission in Bind9 Logs folder - change permissions
 echo "Setup good permission in Bind9 Logs folder - change permissions"
-ssh -i $SSH_PRIV_KEY $GENERIC_ADMIN_USERNAME@$DNS_VM_PUBLIC_IP "sudo chmod -R 775 /var/log/named"
+ssh -i $SSH_PRIV_KEY $GENERIC_ADMIN_USERNAME@$DNS_VM_PUBLIC_IP "sudo chmod -R 775 /var/log/bind9"
 
 ## Copy Bind Config file to DNS Server
 echo "Copy Bind Config File to Remote DNS server"
@@ -1596,6 +1632,22 @@ scp -i $SSH_PRIV_KEY $BIND_CONFIG_FILE_NAME $GENERIC_ADMIN_USERNAME@$DNS_VM_PUBL
 ## sudo cp options file to /etc/bind/
 echo "Copy the Bind File to /etc/bind"
 ssh -i $SSH_PRIV_KEY $GENERIC_ADMIN_USERNAME@$DNS_VM_PUBLIC_IP "sudo cp /tmp/$BIND_CONFIG_FILE_NAME /etc/bind"
+
+## Copy Bind DNS file to DNS Server
+echo "Copy Bind DNS File to Remote DNS server"
+scp -i $SSH_PRIV_KEY $BIND_DNS_FILE_NAME $GENERIC_ADMIN_USERNAME@$DNS_VM_PUBLIC_IP:/tmp
+
+## sudo cp options file to /etc/bind/
+echo "Copy the Bind File to /etc/bind"
+ssh -i $SSH_PRIV_KEY $GENERIC_ADMIN_USERNAME@$DNS_VM_PUBLIC_IP "sudo cp /tmp/$BIND_DNS_FILE_NAME /etc/bind"
+
+## Copy Bind Config file to DNS Server
+echo "Copy Bind Config File to Remote DNS server"
+scp -i $SSH_PRIV_KEY $ZONE_LOCAL_FILE $GENERIC_ADMIN_USERNAME@$DNS_VM_PUBLIC_IP:/tmp
+
+## sudo cp options file to /etc/bind/
+echo "Copy the Bind File to /etc/bind"
+ssh -i $SSH_PRIV_KEY $GENERIC_ADMIN_USERNAME@$DNS_VM_PUBLIC_IP "sudo cp /tmp/$ZONE_LOCAL_FILE /etc/bind"
 
 ## sudo systemctl stop bind9
 echo "Stop Bind9"
@@ -1634,7 +1686,7 @@ data:
         forward . $VM_DNS_PRIV_IP
     }
   byodnsio.server: | 
-    io:53 {
+    $ZONE_NAME:53 {
         log 
         errors
         cache 15
