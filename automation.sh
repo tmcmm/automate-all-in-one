@@ -1566,7 +1566,7 @@ options {
 
 echo "Write to Bind DNS Zone File "
 printf "
-'$'TTL 86400
+\$TTL 86400
 @       IN      SOA     ns1.$ZONE_NAME. admin.$ZONE_NAME. (
                         $(date +%Y%m%d) ; Serial
                         3600            ; Refresh
@@ -1687,6 +1687,15 @@ data:
     }   
 " >> $CORE_DNS_CONFIGMAP
 
+echo "Cleaning up Bind Config File"
+rm -rf $BIND_CONFIG_FILE_NAME
+
+echo "Cleaning up Bind dns zone File"
+rm -rf $BIND_DNS_FILE_NAME
+
+echo "Cleaning up Bind dns zone File"
+rm -rf $ZONE_LOCAL_FILE
+
 ## Get Credentials
 echo "Getting Cluster Credentials"
 az aks get-credentials --resource-group $AKS_RG_NAME --name $AKS_CLUSTER_NAME --overwrite-existing
@@ -1697,15 +1706,6 @@ kubectl apply -f $CORE_DNS_CONFIGMAP
 ## Re-deploy CoreDNS pods 
 echo "Re-deploy CoreDNS pods"
 kubectl rollout restart -n kube-system deployment/coredns
-
-echo "Cleaning up Bind Config File"
-rm -rf $BIND_CONFIG_FILE_NAME
-
-echo "Cleaning up Bind dns zone File"
-rm -rf $BIND_DNS_FILE_NAME
-
-echo "Cleaning up Bind dns zone File"
-rm -rf $ZONE_LOCAL_FILE
 
 }
 

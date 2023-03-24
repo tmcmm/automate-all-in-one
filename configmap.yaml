@@ -20,7 +20,7 @@ data:
         forward . 10.4.7.4
     }
   byodnsio.server: | 
-    io:53 {
+    mydomain.local:53 {
         log 
         errors
         cache 15
