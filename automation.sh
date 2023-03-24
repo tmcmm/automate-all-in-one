@@ -1511,13 +1511,6 @@ ZONE_NAME="mydomain.local"
 BIND_DNS_FILE_NAME="$ZONE_NAME.local.zone"
 ZONE_LOCAL_FILE="named.conf.local"
 
-echo "Cleaning up Bind Config File"
-rm -rf $BIND_CONFIG_FILE_NAME
-
-echo "Cleaning up Bind dns zone File"
-rm -rf $BIND_DNS_FILE_NAME
-
-
 echo "Write to Bind Config File "
 printf "
 logging {
@@ -1704,6 +1697,15 @@ kubectl apply -f $CORE_DNS_CONFIGMAP
 ## Re-deploy CoreDNS pods 
 echo "Re-deploy CoreDNS pods"
 kubectl rollout restart -n kube-system deployment/coredns
+
+echo "Cleaning up Bind Config File"
+rm -rf $BIND_CONFIG_FILE_NAME
+
+echo "Cleaning up Bind dns zone File"
+rm -rf $BIND_DNS_FILE_NAME
+
+echo "Cleaning up Bind dns zone File"
+rm -rf $ZONE_LOCAL_FILE
 
 }
 
