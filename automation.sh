@@ -1507,22 +1507,22 @@ ssh-keygen -F $DNS_VM_PUBLIC_IP >/dev/null | ssh-keyscan -H $DNS_VM_PUBLIC_IP >>
 
 
 BIND_CONFIG_FILE_NAME="named.conf.options"
-ZONE_NAME="mydomain.local"
-BIND_DNS_FILE_NAME="$ZONE_NAME.local.zone"
+ZONE_NAME="emeacontainers.local"
+BIND_DNS_FILE_NAME="$ZONE_NAME.zone"
 ZONE_LOCAL_FILE="named.conf.local"
 
 echo "Write to Bind Config File "
 printf "
 logging {
           channel "misc" {
-                    file \"/var/log/bind9/misc.log\" versions 4 size 4m;
+                    file \"/var/log/named/misc.log\" versions 4 size 4m;
                     print-time YES;
                     print-severity YES;
                     print-category YES;
           };
   
           channel "query" {
-                    file \"/var/log/bind9/query.log\" versions 4 size 4m;
+                    file \"/var/named/bind9/query.log\" versions 4 size 4m;
                     print-time YES;
                     print-severity NO;
                     print-category NO;
@@ -1567,17 +1567,17 @@ options {
 echo "Write to Bind DNS Zone File "
 printf "
 \$TTL 86400
-@       IN      SOA     ns1.$ZONE_NAME. admin.$ZONE_NAME. (
-                        $(date +%Y%m%d) ; Serial
-                        3600            ; Refresh
-                        1800            ; Retry
-                        604800          ; Expire
-                        86400           ; Minimum TTL
+@       IN      SOA     aks.$ZONE_NAME. admin.$ZONE_NAME. (
+                        $(date +%Y%m%d)   ; Serial
+                        3600              ; Refresh
+                        1800              ; Retry
+                        604800            ; Expire
+                        86400             ; Minimum TTL
                 )
 
-@       IN      NS      ns1.$ZONE_NAME.
-@       IN      A       $VM_DNS_PRIV_IP
-www     IN      A       $VM_DNS_PRIV_IP
+@       IN      NS      aks.$ZONE_NAME.
+aks     IN      A       $VM_DNS_PRIV_IP
+emea    IN      CNAME   aks.$ZONE_NAME.
 "  >> $BIND_DNS_FILE_NAME
 
 echo "Write to local dns zone file "
@@ -1588,6 +1588,7 @@ printf "
 // Consider adding the 1918 zones here, if they are not used in your
 // organization
 //include "/etc/bind/zones.rfc1918";
+
 zone $ZONE_NAME {
     type master;
     file $BIND_DNS_FILE_NAME;
@@ -1605,18 +1606,19 @@ ssh -i $SSH_PRIV_KEY $GENERIC_ADMIN_USERNAME@$DNS_VM_PUBLIC_IP "sudo apt install
 ## Setup Bind9
 echo "Setup Bind9"
 ssh -i $SSH_PRIV_KEY $GENERIC_ADMIN_USERNAME@$DNS_VM_PUBLIC_IP "sudo cp /etc/bind/named.conf.options /etc/bind/named.conf.options.backup"
+ssh -i $SSH_PRIV_KEY $GENERIC_ADMIN_USERNAME@$DNS_VM_PUBLIC_IP "sudo cp /etc/bind/named.conf.local /etc/bind/named.conf.local.backup"
 
 ## Create Bind9 Logs folder
 echo "Create Bind9 Logs folder"
-ssh -i $SSH_PRIV_KEY $GENERIC_ADMIN_USERNAME@$DNS_VM_PUBLIC_IP "sudo mkdir /var/log/bind9"
+ssh -i $SSH_PRIV_KEY $GENERIC_ADMIN_USERNAME@$DNS_VM_PUBLIC_IP "sudo mkdir -p /var/named/bind9"
 
 ## Setup good permission in Bind9 Logs folder - change owner
 echo "Setup good permission in Bind9 Logs folder - change owner"
-ssh -i $SSH_PRIV_KEY $GENERIC_ADMIN_USERNAME@$DNS_VM_PUBLIC_IP "sudo chown -R bind:bind /var/log/bind9"
+ssh -i $SSH_PRIV_KEY $GENERIC_ADMIN_USERNAME@$DNS_VM_PUBLIC_IP "sudo chown -R bind:bind /var/named/bind9"
 
 ## Setup good permission in Bind9 Logs folder - change permissions
 echo "Setup good permission in Bind9 Logs folder - change permissions"
-ssh -i $SSH_PRIV_KEY $GENERIC_ADMIN_USERNAME@$DNS_VM_PUBLIC_IP "sudo chmod -R 775 /var/log/bind9"
+ssh -i $SSH_PRIV_KEY $GENERIC_ADMIN_USERNAME@$DNS_VM_PUBLIC_IP "sudo chmod -R 775 /var/named/bind9"
 
 ## Copy Bind Config file to DNS Server
 echo "Copy Bind Config File to Remote DNS server"
@@ -1656,7 +1658,7 @@ CORE_DNS_CONFIGMAP="configmap.yaml"
 echo "Cleaning up Bind Config File"
 rm -rf $CORE_DNS_CONFIGMAP
 
-echo "Write to Bind Config File "
+echo "Write to Core DNS Custom ConfigMap"
 printf "
 apiVersion: v1
 kind: ConfigMap
@@ -1664,20 +1666,6 @@ metadata:
   name: coredns-custom
   namespace: kube-system
 data:
-  azure.server: | 
-    com:53 {
-        log
-        errors
-        cache 30
-        forward . 168.63.129.16
-    }
-  byodnspt.server: | 
-    pt:53 {
-        log
-        errors
-        cache 15
-        forward . $VM_DNS_PRIV_IP
-    }
   byodnsio.server: | 
     $ZONE_NAME:53 {
         log 
