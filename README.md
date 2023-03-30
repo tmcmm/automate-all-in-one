@@ -29,5 +29,5 @@ Put the following under /home/user/.bashrc
 function az () { docker run -i --rm -u `id -u`:`id -g` -v $HOME:$HOME -v /tmp:/tmp -v `echo "/$(echo "$PWD" | cut -d "/" -f2)"`:`echo "/$(echo "$PWD" | cut -d "/" -f2)"`  -w $PWD -e HOME=$HOME mcr.microsoft.com/azure-cli "$@"; }
 export -f az
 ```
-### Run the 
+### Run the automation script and choose your numeric option 
 ![automation](./assets/automation.png)
