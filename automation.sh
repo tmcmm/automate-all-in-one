@@ -1862,8 +1862,7 @@ if [[ $WINDOWS_RG_NAME_EXIST -ne 0 ]]
     echo -e "\n--> Creating the non existent Resource Group ${WINDOWS_RG_NAME} ...\n"
     az group create --name $WINDOWS_RG_NAME --location $WINDOWS_DNS_LOCATION
   else
-    echo "The Resource Group already exists"
-    break;
+    echo "The Resource Group already exists - Continue"
 fi
 
 ## WINDOWS VM DNS Server Vnet and Subnet Creation
