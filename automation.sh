@@ -1857,12 +1857,13 @@ echo "What is the VNET Name of your AKS:"
 read -e AKS_VNET_NAME
 
 WINDOWS_RG_NAME_EXIST=$(az group show -g $WINDOWS_RG_NAME &>/dev/null; echo $?)
-if [[ $WINDOWS_RG_NAME_EXIST -eq 0 ]]
+if [[ $WINDOWS_RG_NAME_EXIST -ne 0 ]]
   then
     echo -e "\n--> Creating the non existent Resource Group ${WINDOWS_RG_NAME} ...\n"
     az group create --name $WINDOWS_RG_NAME --location $WINDOWS_DNS_LOCATION
   else
     echo "The Resource Group already exists"
+    break;
 fi
 
 ## WINDOWS VM DNS Server Vnet and Subnet Creation
