@@ -17,11 +17,11 @@ printf "|`tput bold` %-40s `tput sgr0`|\n" "Change params.sh - specific scenario
 printf "|`tput bold` %-40s `tput sgr0`|\n" "Generate ssh key pair with"
 printf "|`tput bold` %-40s `tput sgr0`|\n" "ssh-keygen -o -t rsa -b 4096 -C email"
 printf "|`tput bold` %-40s `tput sgr0`|\n" "export ADMIN_USERNAME_SSH_KEYS_PUB"
+printf "|`tput bold` %-40s `tput sgr0`|\n" "export WINDOWS_ADMIN_PASSWORD"
 
 sleep 2
 showHelp() {
 cat << EOF  
-
 
 bash $SCRIPT_NAME --help/-h  [for help]
 bash $SCRIPT_NAME --version/-v  [for version]
@@ -44,7 +44,7 @@ EOF
 # Variable definition
 SCRIPT_PATH="$( cd "$(dirname "$0")" ; pwd -P )"
 SCRIPT_NAME="$(echo $0 | sed 's|\.\/||g')"
-SCRIPT_VERSION="Version v2.0 20230123"
+SCRIPT_VERSION="Version v3.0 20230330"
 
 # Load parameters
 set -e
@@ -1709,8 +1709,6 @@ read -e LINUX_RG_NAME
 #    az group create --name $LINUX_RG_NAME --location $LINUX_RG_LOCATION
 #fi
 
-#read -p "Enter [y/n] : " opt
-
 echo "On which Vnet do you want to deploy the Linux VM:"
 read -e LINUX_VM_VNET_NAME
 
@@ -1844,6 +1842,164 @@ az vm create \
   ssh -i $LINUX_SSH_PRIV_KEY $GENERIC_ADMIN_USERNAME@$LINUX_VM_PUBLIC_IP
 }
 
+function windows_dns(){
+
+echo "What is the Resource Group name where you want to deploy Windows DNS Server"
+read -e WINDOWS_RG_NAME
+
+echo "On which Resource Group does your AKS VNET is:"
+read -e AKS_RG_NAME
+
+echo "What is the Cluster Name:"
+read -e AKS_CLUSTER_NAME
+
+echo "What is the VNET Name of your AKS:"
+read -e AKS_VNET_NAME
+
+WINDOWS_RG_NAME_EXIST=$(az group show -g $WINDOWS_RG_NAME &>/dev/null; echo $?)
+if [[ $WINDOWS_RG_NAME_EXIST -ne 0 ]]
+   then
+    echo -e "\n--> Creating the non existent Resource Group ${LINUX_RG_NAME} ...\n"
+    az group create --name $WINDOWS_RG_NAME --location $WINDOWS_DNS_LOCATION
+else
+    echo "The Resource Group already exists"
+fi
+
+## WINDOWS VM DNS Server Vnet and Subnet Creation
+echo "Create Windows DNS Server Vnet & Subnet"
+az network vnet create \
+  --resource-group $WINDOWS_RG_NAME \
+  --name $WINDOWS_VM_VNET_NAME \
+  --address-prefix $WINDOWS_VM_VNET_CIDR \
+  --subnet-name $WINDOWS_VM_SUBNET_NAME \
+  --subnet-prefix $WINDOWS_VM_SNET_CIDR \
+  --debug
+
+AKS_VNET_ID=$(az network vnet show --resource-group $AKS_RG_NAME --name $AKS_VNET_NAME --query id --output tsv)
+WINDOWS_VM_VNET_ID=$(az network vnet show --resource-group $WINDOWS_RG_NAME --name $WINDOWS_VM_VNET_NAME --query id --output tsv)
+
+echo "Peering VNet - AKS-WinDNS"
+az network vnet peering create \
+  --resource-group $AKS_RG_NAME \
+  --name "${AKS_VNET_NAME}-to-${WINDOWS_VM_SUBNET_NAME}" \
+  --vnet-name $AKS_VNET_NAME \
+  --remote-vnet $WINDOWS_VM_VNET_ID \
+  --allow-vnet-access \
+  --debug
+
+echo "Peering Vnet - WinDNS-AKS"
+az network vnet peering create \
+  --resource-group $WINDOWS_RG_NAME \
+  --name "${WINDOWS_VM_SUBNET_NAME}-to-${AKS_VNET_NAME}" \
+  --vnet-name $WINDOWS_VM_VNET_NAME \
+  --remote-vnet $AKS_VNET_ID \
+  --allow-vnet-access \
+  --debug
+
+## Public IP Create
+echo "Create Public IP"
+az network public-ip create \
+  --name $WINDOWS_DNS_PUBLIC_IP_NAME \
+  --resource-group $WINDOWS_RG_NAME \
+  --debug
+
+echo "Sleeping 10s - Allow time for Public IP to be created"
+countdown "00:00:10"
+
+## VM NSG Create
+echo "Create NSG"
+az network nsg create \
+  --resource-group $WINDOWS_RG_NAME \
+  --name $WINDOWS_NSG_NAME \
+  --debug
+
+## VM Nic Create
+echo "Create VM Nic"
+az network nic create \
+  --resource-group $WINDOWS_RG_NAME \
+  --vnet-name $WINDOWS_VM_VNET_NAME \
+  --subnet $WINDOWS_VM_SUBNET_NAME \
+  --name $WINDOWS_DNS_NIC_NAME \
+  --network-security-group $WINDOWS_NSG_NAME \
+  --debug 
+
+## Attach Public IP to VM NIC
+echo "Attach Public IP to VM NIC"
+az network nic ip-config update \
+  --name $VM_DNS_DEFAULT_IP_CONFIG \
+  --nic-name $WINDOWS_DNS_NIC_NAME \
+  --resource-group $WINDOWS_RG_NAME \
+  --public-ip-address $WINDOWS_DNS_PUBLIC_IP_NAME \
+  --debug
+
+## Update NSG in VM Subnet
+echo "Update NSG in VM Subnet"
+az network vnet subnet update \
+  --resource-group $WINDOWS_RG_NAME \
+  --name $WINDOWS_VM_SUBNET_NAME \
+  --vnet-name $WINDOWS_VM_VNET_NAME \
+  --network-security-group $WINDOWS_NSG_NAME \
+  --debug
+
+## Windows Create VM
+echo "Create Windows VM"
+az vm create \
+  --resource-group $WINDOWS_RG_NAME \
+  --name $WIN_VM_NAME \
+  --image $WIN_VM_IMAGE  \
+  --admin-username $GENERIC_ADMIN_USERNAME \
+  --admin-password $WINDOWS_ADMIN_PASSWORD \
+  --nics $WIN_VM_NIC_NAME \
+  --tags $WIN_VM_TAGS \
+  --computer-name $WIN_VM_INTERNAL_NAME \
+  --authentication-type password \
+  --size $WIN_VM_SIZE \
+  --storage-sku $WIN_VM_STORAGE_SKU \
+  --os-disk-size-gb $WIN_VM_OS_DISK_SIZE \
+  --os-disk-name $WIN_VM_OS_DISK_NAME \
+  --nsg-rule NONE \
+  --debug
+
+echo "Sleeping 30s - Allow time for Windows VM Creation"
+countdown "00:00:30"
+## Output Public IP of VM
+WIN_VM_PUBLIC_IP=$(az network public-ip list --resource-group $WINDOWS_RG_NAME -o json | jq -r ".[] | [.name, .ipAddress] | @csv" | grep rdc | awk -F "," '{print $2}')
+WIN_VM_PUBLIC_IP_PARSED=$(echo $WIN_VM_PUBLIC_IP | sed 's/"//g')
+
+echo "Public IP of VM is:"
+echo $WIN_VM_PUBLIC_IP_PARSED
+
+## Allow RDP from local ISP
+echo "Update VM NSG to allow RDP"
+az network nsg rule create \
+  --nsg-name $WINDOWS_NSG_NAME \
+  --resource-group $WINDOWS_RG_NAME \
+  --name rdp_allow \
+  --priority 100 \
+  --source-address-prefixes $MY_HOME_PUBLIC_IP \
+  --source-port-ranges '*' \
+  --destination-address-prefixes $WINDOWS_VM_PRIV_IP \
+  --destination-port-ranges 3389 \
+  --access Allow \
+  --protocol Tcp \
+  --description "Allow from MY ISP IP"
+
+az vm run-command invoke --resource-group $WINDOWS_RG_NAME --name $WIN_VM_NAME \
+   --command-id RunPowerShellScript \
+   --scripts "Install-WindowsFeature -name DNS -IncludeManagementTools -IncludeAllSubFeature"
+   
+az vm run-command invoke --resource-group $WINDOWS_RG_NAME --name $WIN_VM_NAME \
+   --command-id RunPowerShellScript \
+   --scripts "Add-DnsServerPrimaryZone -Name 'containers.emea.bb' -ZoneFile 'containers.emea.bb.dns'"
+   
+az vm run-command invoke --resource-group $WINDOWS_RG_NAME --name $WIN_VM_NAME \
+   --command-id RunPowerShellScript \
+   --scripts "Add-DnsServerResourceRecordA -Name '@' -Ipv4address 1.2.3.4 -ZoneName 'containers.emea.bb' ; Add-DnsServerResourceRecordCName -Name 'www' -HostNameAlias 'containers.emea.bb' -ZoneName 'containers.emea.bb'"
+   
+### Change DNs server for AKS VNET
+az network vnet update --resource-group $AKS_RG_NAME --name $AKS_VNET_NAME --dns-servers $WINDOWS_VM_PRIV_IP
+
+}
 function list_aks() {
 function printTable(){
     local -r delimiter="${1}"
@@ -2026,7 +2182,7 @@ kubectl apply -f app-ingress.yaml --namespace ingress-basic
 
 }
 
-options=("Azure Cluster" "Kubenet Cluster" "Private Cluster" "List existing AKS Clusters" "Create Linux VM on Subnet" "Linux DNS VM" "Helm Nginx Ingress Controller" "Destroy Environment" "Quit")
+options=("Azure Cluster" "Kubenet Cluster" "Private Cluster" "List existing AKS Clusters" "Create Linux VM on Subnet" "Linux DNS VM" "Windows DNS VM" "Helm Nginx Ingress Controller" "Destroy Environment" "Quit")
 select opt in "${options[@]}"
 do    
 	case $opt in
@@ -2064,6 +2220,10 @@ do
       "Linux DNS VM")
         az_login_check
         linux_dns
+        break;;
+      "Windows DNS VM")
+        az_login_check
+        windows_dns
         break;;
 	    "Helm Nginx Ingress Controller")
         az_login_check

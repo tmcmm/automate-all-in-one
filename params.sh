@@ -1,9 +1,10 @@
 ## GENERAL VARIABLES
 PURPOSE="default"
 AKS_RG_LOCATION="westeurope"
-AKS_VERSION="1.24.6"
+AKS_VERSION="1.24.9"
 AKS_VNET_2_OCTETS="10.4"   # Define the fisrt 2 octets for Vnet
 LINUX_VNET_2_OCTETS="10.5" # Define the fisrt 2 octets for Linux Vnet
+WINDOWS_VNET_2_OCTETS="10.6" # Define the fisrt 2 octets for Windows Vnet
 AKS_ZONES="1 2 3"          # Define AKS Zones
 AKS_2ND_NP_ZONES="1 2 3"   # Defines NP Zones
 
@@ -94,27 +95,38 @@ LINUX_VM_NIC_NAME="$LINUX_VM_NAME""_nic01"
 LINUX_TAGS="env=kubernetes"
 
 
-## DNS Parameters
-VM_DNS_SUBNET_NAME="dns-subnet"
-
-## Running Options
-JUST_BIND="0"              # 1 - If we just want to deploy Bind server
-ALL="1"                    # 1 - If we want to deploy all, VM + Bind
-
-## Bind9 Forwarders
-VM_BIND_FORWARDERS_01="168.63.129.16"
-VM_BIND_FORWARDERS_02="1.1.1.1"
-
-## VM Specific Networking
-VM_DNS_SUBNET_NAME="snet-dns-server"
-VM_DNS_SNET_CIDR="$AKS_VNET_2_OCTETS.7.0/28"
-VM_DNS_PRIV_IP="$AKS_VNET_2_OCTETS.7.4"
 
 
+## Windows DNS Parameters
+WINDOWS_DNS_LOCATION="westeurope"
+WINDOWS_VM_VNET_NAME="windows-vnet-dns"
+WINDOWS_VM_VNET_CIDR="$WINDOWS_VNET_2_OCTETS.6.0/24"
+WINDOWS_VM_SUBNET_NAME="windows-subnet-dns"
+WINDOWS_VM_SNET_CIDR="$WINDOWS_VNET_2_OCTETS.6.0/28"
+WINDOWS_VM_PRIV_IP="$WINDOWS_VNET_2_OCTETS.6.4/32"
+WINDOWS_DNS_PUBLIC_IP_NAME="windows-dns-pip"
+WINDOWS_NSG_NAME="windows-dns-nsg"
+WINDOWS_DNS_NIC_NAME="windows-dns-nic01"
+WIN_VM_NAME="windows-brownbag-dns"
+WIN_VM_INTERNAL_NAME="windows-dns"
+WIN_VM_IMAGE_PROVIDER="MicrosoftWindowsServer"
+WIN_VM_IMAGE_OFFER="WindowsServer"
+WIN_VM_IMAGE_SKU="2022-Datacenter"
+WIN_VM_IMAGE_VERSION="latest"
+WIN_VM_IMAGE="$WIN_VM_IMAGE_PROVIDER:$WIN_VM_IMAGE_OFFER:$WIN_VM_IMAGE_SKU:$WIN_VM_IMAGE_VERSION"
+WIN_VM_SIZE="Standard_D4s_v3"
+WIN_VM_STORAGE_SKU="Standard_LRS"
+WIN_VM_OS_DISK_SIZE="130"
+WIN_VM_OS_DISK_NAME="$WIN_VM_NAME""_disk_01"
+WIN_VM_NSG_NAME="$WIN_VM_NAME""_nsg"
+WIN_VM_NIC_NAME="$WIN_VM_NAME""nic01"
+WIN_VM_TAGS="dns=brownbag"
 
-## VM SSH Client
+
+
+## Linux DNS Parameters
 CONTEXT="dns"
-DNS_VM_NAME="virtualmachine"-$CONTEXT
+DNS_VM_NAME="linux"-$CONTEXT
 DNS_INTERNAL_VM_NAME="dns-internal"
 DNS_VM_TAGS="purpose=dns-server"
 DNS_NSG_NAME="$DNS_VM_NAME""-nsg"
@@ -124,5 +136,15 @@ DNS_VM_OS_DISK_NAME="$DNS_VM_NAME""-OSdisk"
 ## Public IP Name
 VM_DNS_PUBLIC_IP_NAME="$DNS_VM_NAME""-pip"
 VM_DNS_DEFAULT_IP_CONFIG="ipconfig1"
+
+VM_DNS_SUBNET_NAME="dns-subnet"
+
+## Bind9 Forwarders
+VM_BIND_FORWARDERS_01="168.63.129.16"
+VM_BIND_FORWARDERS_02="1.1.1.1"
+## VM Specific Networking
+VM_DNS_SUBNET_NAME="snet-dns-server"
+VM_DNS_SNET_CIDR="$AKS_VNET_2_OCTETS.7.0/28"
+VM_DNS_PRIV_IP="$AKS_VNET_2_OCTETS.7.4"
 
 
