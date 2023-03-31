@@ -1387,6 +1387,8 @@ fi
 
 
 linux_dns () {
+echo "What is the Resource Group name where you want to deploy Linux DNS Server"
+read -e LINUX_RG_NAME
 
 echo "On which Resource Group does your AKS VNET is:"
 read -e AKS_RG_NAME
@@ -1397,94 +1399,127 @@ read -e AKS_CLUSTER_NAME
 echo "What is the VNET Name of your AKS:"
 read -e AKS_VNET_NAME
 
-## VM DNS Server Subnet Creation
-echo "Create VM DNS Server Subnet"
-az network vnet subnet create \
+LINUX_RG_NAME_EXIST=$(az group show -g $LINUX_RG_NAME &>/dev/null; echo $?)
+if [[ $LINUX_RG_NAME_EXIST -ne 0 ]]
+  then
+    echo -e "\n--> Creating the non existent Resource Group ${LINUX_RG_NAME} ...\n"
+    az group create --name $LINUX_RG_NAME --location $LINUX_VM_LOCATION
+  else
+    echo "The Resource Group already exists - Continue"
+fi
+
+## LINUX VM DNS Server Vnet and Subnet Creation
+echo "Create Linux DNS Server Vnet & Subnet"
+az network vnet create \
+  --resource-group $LINUX_RG_NAME \
+  --name $LINUX_DNS_VNET_NAME \
+  --address-prefix $LINUX_DNS_VNET_CIDR \
+  --subnet-name $LINUX_DNS_SUBNET_NAME \
+  --subnet-prefix $LINUX_DNS_SNET_CIDR \
+  --debug
+
+AKS_VNET_ID=$(az network vnet show --resource-group $AKS_RG_NAME --name $AKS_VNET_NAME --query id --output tsv)
+LINUX_VM_VNET_ID=$(az network vnet show --resource-group $LINUX_RG_NAME --name $LINUX_DNS_VNET_NAME --query id --output tsv)
+
+echo "Peering VNet - AKS-LinuxDNS"
+az network vnet peering create \
   --resource-group $AKS_RG_NAME \
+  --name "${AKS_VNET_NAME}-to-${LINUX_DNS_VNET_NAME}" \
   --vnet-name $AKS_VNET_NAME \
-  --name $VM_DNS_SUBNET_NAME \
-  --address-prefixes $VM_DNS_SNET_CIDR \
+  --remote-vnet $LINUX_VM_VNET_ID \
+  --allow-vnet-access \
+  --debug
+
+echo "Peering Vnet - LinuxDNS-AKS"
+az network vnet peering create \
+  --resource-group $LINUX_RG_NAME \
+  --name "${LINUX_DNS_VNET_NAME}-to-${AKS_VNET_NAME}" \
+  --vnet-name $LINUX_DNS_VNET_NAME \
+  --remote-vnet $AKS_VNET_ID \
+  --allow-vnet-access \
   --debug
 
 ## VM NSG Create
 echo "Create NSG"
 az network nsg create \
-  --resource-group $AKS_RG_NAME \
-  --name $DNS_NSG_NAME \
+  --resource-group $LINUX_RG_NAME \
+  --name $LINUX_DNS_NSG_NAME \
   --debug
 
 ## Public IP Create
 echo "Create Public IP"
 az network public-ip create \
-  --name $VM_DNS_PUBLIC_IP_NAME \
-  --resource-group $AKS_RG_NAME \
+  --name $LINUX_DNS_PUBLIC_IP_NAME \
+  --resource-group $LINUX_RG_NAME \
   --debug
 
 ## VM Nic Create
 echo "Create VM Nic"
 az network nic create \
-  --resource-group $AKS_RG_NAME \
-  --vnet-name $AKS_VNET_NAME \
-  --subnet $VM_DNS_SUBNET_NAME \
-  --name $DNS_NIC_NAME \
-  --network-security-group $DNS_NSG_NAME \
+  --resource-group $LINUX_RG_NAME \
+  --vnet-name $LINUX_DNS_VNET_NAME \
+  --subnet $LINUX_DNS_SUBNET_NAME \
+  --name $LINUX_DNS_NIC_NAME \
+  --network-security-group $LINUX_DNS_NSG_NAME \
   --debug 
 
 ## Attach Public IP to VM NIC
 echo "Attach Public IP to VM NIC"
 az network nic ip-config update \
   --name $VM_DNS_DEFAULT_IP_CONFIG \
-  --nic-name $DNS_NIC_NAME \
-  --resource-group $AKS_RG_NAME \
-  --public-ip-address $VM_DNS_PUBLIC_IP_NAME \
+  --nic-name $LINUX_DNS_NIC_NAME \
+  --resource-group $LINUX_RG_NAME \
+  --public-ip-address $LINUX_DNS_PUBLIC_IP_NAME \
   --debug
 
 ## Update NSG in VM Subnet
 echo "Update NSG in VM Subnet"
 az network vnet subnet update \
-  --resource-group $AKS_RG_NAME \
-  --name $VM_DNS_SUBNET_NAME \
-  --vnet-name $AKS_VNET_NAME \
-  --network-security-group $DNS_NSG_NAME \
+  --resource-group $LINUX_RG_NAME \
+  --name $LINUX_DNS_SUBNET_NAME \
+  --vnet-name $LINUX_DNS_VNET_NAME \
+  --network-security-group $LINUX_DNS_NSG_NAME \
   --debug
 
 ## Create VM
 echo "Create VM"
 az vm create \
-  --resource-group $AKS_RG_NAME \
+  --resource-group $LINUX_RG_NAME \
   --authentication-type $LINUX_AUTH_TYPE \
-  --name $DNS_VM_NAME \
-  --computer-name $DNS_INTERNAL_VM_NAME \
+  --name $LINUX_DNS_VM_NAME \
+  --computer-name $LINUX_DNS_INTERNAL_VM_NAME \
   --image $LINUX_VM_IMAGE \
   --size $LINUX_VM_SIZE \
   --admin-username $GENERIC_ADMIN_USERNAME \
   --ssh-key-values $ADMIN_USERNAME_SSH_KEYS_PUB \
   --storage-sku $LINUX_VM_STORAGE_SKU \
   --os-disk-size-gb $LINUX_VM_OS_DISK_SIZE \
-  --os-disk-name $DNS_VM_OS_DISK_NAME \
-  --nics $DNS_NIC_NAME \
-  --tags $DNS_VM_TAGS \
+  --os-disk-name $LINUX_DNS_DISK_NAME \
+  --nics $LINUX_DNS_NIC_NAME \
+  --tags $LINUX_DNS_VM_TAGS \
   --debug
 
-echo "Sleeping 30s - Allow time for Public IP"
-  countdown "00:00:30"
+echo "Sleeping 10s - Allow time for Public IP"
+  countdown "00:00:10"
 
 ## Output Public IP of VM
-echo "Public IP of VM is:"
 DNS_VM_PUBLIC_IP=$(az network public-ip list \
-  --resource-group $AKS_RG_NAME \
-  --output json | jq -r ".[] | select (.name==\"$VM_DNS_PUBLIC_IP_NAME\") | [ .ipAddress] | @tsv")
+  --resource-group $LINUX_RG_NAME \
+  --output json | jq -r ".[] | select (.name==\"$LINUX_DNS_PUBLIC_IP_NAME\") | [ .ipAddress] | @tsv")
+
+echo "Public IP of VM is:"
+echo $DNS_VM_PUBLIC_IP
 
 ## Allow SSH from local ISP
 echo "Update VM NSG to allow SSH"
 az network nsg rule create \
-  --nsg-name $DNS_NSG_NAME \
-  --resource-group $AKS_RG_NAME \
+  --nsg-name $LINUX_DNS_NSG_NAME \
+  --resource-group $LINUX_RG_NAME \
   --name ssh_allow \
   --priority 100 \
   --source-address-prefixes $MY_HOME_PUBLIC_IP \
   --source-port-ranges '*' \
-  --destination-address-prefixes $VM_DNS_PRIV_IP \
+  --destination-address-prefixes $LINUX_VM_DNS_PRIV_IP \
   --destination-port-ranges 22 \
   --access Allow \
   --protocol Tcp \
@@ -1943,27 +1978,28 @@ az network vnet subnet update \
 
 ## Windows Create VM
 echo "Create Windows VM"
+echo $WIN_VM_IMAGE
 az vm create \
   --resource-group $WINDOWS_RG_NAME \
-  --name $WIN_VM_NAME \
-  --image $WIN_VM_IMAGE  \
+  --name $WINDOWS_VM_NAME \
+  --image "MicrosoftWindowsServer:WindowsServer:2019-Datacenter:latest"  \
   --admin-username $GENERIC_ADMIN_USERNAME \
   --admin-password $WINDOWS_ADMIN_PASSWORD \
-  --nics $WIN_VM_NIC_NAME \
-  --tags $WIN_VM_TAGS \
-  --computer-name $WIN_VM_INTERNAL_NAME \
+  --nics $WINDOWS_DNS_NIC_NAME \
+  --tags $WINDOWS_VM_TAGS \
+  --computer-name $WINDOWS_VM_INTERNAL_NAME \
   --authentication-type password \
-  --size $WIN_VM_SIZE \
-  --storage-sku $WIN_VM_STORAGE_SKU \
-  --os-disk-size-gb $WIN_VM_OS_DISK_SIZE \
-  --os-disk-name $WIN_VM_OS_DISK_NAME \
+  --size $WINDOWS_VM_SIZE \
+  --storage-sku $WINDOWS_VM_STORAGE_SKU \
+  --os-disk-size-gb $WINDOWS_VM_OS_DISK_SIZE \
+  --os-disk-name $WINDOWS_VM_OS_DISK_NAME \
   --nsg-rule NONE \
   --debug
 
 echo "Sleeping 30s - Allow time for Windows VM Creation"
 countdown "00:00:30"
 ## Output Public IP of VM
-WIN_VM_PUBLIC_IP=$(az network public-ip list --resource-group $WINDOWS_RG_NAME -o json | jq -r ".[] | [.name, .ipAddress] | @csv" | grep rdc | awk -F "," '{print $2}')
+WIN_VM_PUBLIC_IP=$(az network public-ip list --resource-group $WINDOWS_RG_NAME -o json | jq -r ".[] | [.name, .ipAddress] | @csv" | grep $WINDOWS_DNS_PUBLIC_IP_NAME | awk -F "," '{print $2}')
 WIN_VM_PUBLIC_IP_PARSED=$(echo $WIN_VM_PUBLIC_IP | sed 's/"//g')
 
 echo "Public IP of VM is:"
@@ -1984,20 +2020,36 @@ az network nsg rule create \
   --protocol Tcp \
   --description "Allow from MY ISP IP"
 
-az vm run-command invoke --resource-group $WINDOWS_RG_NAME --name $WIN_VM_NAME \
+az vm run-command invoke --resource-group $WINDOWS_RG_NAME --name $WINDOWS_VM_NAME \
    --command-id RunPowerShellScript \
    --scripts "Install-WindowsFeature -name DNS -IncludeManagementTools -IncludeAllSubFeature"
    
-az vm run-command invoke --resource-group $WINDOWS_RG_NAME --name $WIN_VM_NAME \
+az vm run-command invoke --resource-group $WINDOWS_RG_NAME --name $WINDOWS_VM_NAME \
    --command-id RunPowerShellScript \
    --scripts "Add-DnsServerPrimaryZone -Name 'containers.emea.bb' -ZoneFile 'containers.emea.bb.dns'"
    
-az vm run-command invoke --resource-group $WINDOWS_RG_NAME --name $WIN_VM_NAME \
+az vm run-command invoke --resource-group $WINDOWS_RG_NAME --name $WINDOWS_VM_NAME \
    --command-id RunPowerShellScript \
    --scripts "Add-DnsServerResourceRecordA -Name '@' -Ipv4address 1.2.3.4 -ZoneName 'containers.emea.bb' ; Add-DnsServerResourceRecordCName -Name 'www' -HostNameAlias 'containers.emea.bb' -ZoneName 'containers.emea.bb'"
    
-### Change DNs server for AKS VNET
+### Change DNS server for AKS VNET
+echo "Changing $AKS_VNET_NAME DNS configuration"
 az network vnet update --resource-group $AKS_RG_NAME --name $AKS_VNET_NAME --dns-servers $WINDOWS_VM_PRIV_IP
+
+
+echo "Sleeping 10s - Allow time for DNS Servers to be changed at VNET Level"
+countdown "00:00:10"
+
+### Perform a DHCP release on the cluster nodes
+NODE_RESOURCE_GROUP=$(az aks show --resource-group $AKS_RG_NAME --name $AKS_CLUSTER_NAME --query nodeResourceGroup --output tsv)
+NODE_INSTANCES_NAME=($(az vmss list --resource-group $NODE_RESOURCE_GROUP --query [].name --output tsv))
+
+for vmssName in "${NODE_INSTANCES_NAME[@]}"
+do
+    #  Perform DHCP release for each of the vmss instance
+    echo "Performing DHCP release for each $vmssName instance"
+    az vmss list-instances --resource-group  $NODE_RESOURCE_GROUP --name $vmssName --query "[].id" --output tsv | az vmss run-command invoke --scripts "grep nameserver /etc/resolv.conf || { dhclient -x; dhclient -i eth0; sleep 10; pkill dhclient; grep nameserver /etc/resolv.conf; }" --command-id RunShellScript --ids @-
+done
 
 }
 function list_aks() {
