@@ -1611,7 +1611,7 @@ printf "
                 )
 
 @       IN      NS      aks.$ZONE_NAME.
-aks     IN      A       $VM_DNS_PRIV_IP
+aks     IN      A       $LINUX_VM_DNS_PRIV_IP
 emea    IN      CNAME   aks.$ZONE_NAME.
 "  >> $BIND_DNS_FILE_NAME
 
@@ -1706,7 +1706,7 @@ data:
         log 
         errors
         cache 15
-        forward . $VM_DNS_PRIV_IP
+        forward . $LINUX_VM_DNS_PRIV_IP
     }   
 " >> $CORE_DNS_CONFIGMAP
 
@@ -1729,6 +1729,9 @@ kubectl apply -f $CORE_DNS_CONFIGMAP
 ## Re-deploy CoreDNS pods 
 echo "Re-deploy CoreDNS pods"
 kubectl rollout restart -n kube-system deployment/coredns
+
+echo "Cleaning up Bind Config File"
+rm -rf $CORE_DNS_CONFIGMAP
 
 }
 
@@ -1878,19 +1881,6 @@ az vm create \
 }
 
 function windows_dns(){
-
-echo "What is the Resource Group name where you want to deploy Windows DNS Server"
-read -e WINDOWS_RG_NAME
-
-echo "On which Resource Group does your AKS VNET is:"
-read -e AKS_RG_NAME
-
-echo "What is the Cluster Name:"
-read -e AKS_CLUSTER_NAME
-
-echo "What is the VNET Name of your AKS:"
-read -e AKS_VNET_NAME
-
 WINDOWS_RG_NAME_EXIST=$(az group show -g $WINDOWS_RG_NAME &>/dev/null; echo $?)
 if [[ $WINDOWS_RG_NAME_EXIST -ne 0 ]]
   then
@@ -2040,6 +2030,9 @@ az network vnet update --resource-group $AKS_RG_NAME --name $AKS_VNET_NAME --dns
 echo "Sleeping 10s - Allow time for DNS Servers to be changed at VNET Level"
 countdown "00:00:10"
 
+}
+
+function dhcp_release() {
 ### Perform a DHCP release on the cluster nodes
 NODE_RESOURCE_GROUP=$(az aks show --resource-group $AKS_RG_NAME --name $AKS_CLUSTER_NAME --query nodeResourceGroup --output tsv)
 NODE_INSTANCES_NAME=($(az vmss list --resource-group $NODE_RESOURCE_GROUP --query [].name --output tsv))
@@ -2050,8 +2043,8 @@ do
     echo "Performing DHCP release for each $vmssName instance"
     az vmss list-instances --resource-group  $NODE_RESOURCE_GROUP --name $vmssName --query "[].id" --output tsv | az vmss run-command invoke --scripts "grep nameserver /etc/resolv.conf || { dhclient -x; dhclient -i eth0; sleep 10; pkill dhclient; grep nameserver /etc/resolv.conf; }" --command-id RunShellScript --ids @-
 done
-
 }
+
 function list_aks() {
 function printTable(){
     local -r delimiter="${1}"
@@ -2234,7 +2227,7 @@ kubectl apply -f app-ingress.yaml --namespace ingress-basic
 
 }
 
-options=("Azure Cluster" "Kubenet Cluster" "Private Cluster" "List existing AKS Clusters" "Create Linux VM on Subnet" "Linux DNS VM" "Windows DNS VM" "Helm Nginx Ingress Controller" "Destroy Environment" "Quit")
+options=("Azure Cluster" "Kubenet Cluster" "Private Cluster" "List existing AKS Clusters" "Create Linux VM on Subnet" "Linux DNS VM" "Windows DNS VM" "DHCP Release" "Helm Nginx Ingress Controller" "Destroy Environment" "Quit")
 select opt in "${options[@]}"
 do    
 	case $opt in
@@ -2275,8 +2268,23 @@ do
         break;;
       "Windows DNS VM")
         az_login_check
-        windows_dns
+        echo "What is the Resource Group name where you want to deploy Windows DNS Server"
+        read -e WINDOWS_RG_NAME
+        echo "On which Resource Group does your AKS VNET is:"
+        read -e AKS_RG_NAME
+        echo "What is the Cluster Name:"
+        read -e AKS_CLUSTER_NAME
+        echo "What is the VNET Name of your AKS:"
+        read -e AKS_VNET_NAME
         break;;
+      "DHCP Release")
+        az_login_check
+        echo "What is the Resource Group of your AKS:"
+        read -e AKS_RG_NAME
+        echo "What is the Cluster Name:"
+        read -e AKS_CLUSTER_NAME
+        dhcp_release
+      break;;
 	    "Helm Nginx Ingress Controller")
         az_login_check
         helm_nginx
