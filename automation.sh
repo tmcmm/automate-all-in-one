@@ -1385,7 +1385,6 @@ fi
 
 }
 
-
 linux_dns () {
 echo "What is the Resource Group name where you want to deploy Linux DNS Server"
 read -e LINUX_RG_NAME
@@ -1849,6 +1848,14 @@ az vm create \
   ## Install and update software
   echo "Updating VM and Stuff"
   ssh -i $LINUX_SSH_PRIV_KEY $GENERIC_ADMIN_USERNAME@$LINUX_VM_PUBLIC_IP "sudo apt update && sudo apt upgrade -y"
+  ssh -i $LINUX_SSH_PRIV_KEY $GENERIC_ADMIN_USERNAME@$LINUX_VM_PUBLIC_IP "sudo apt-get install ca-certificates curl gnupg -y"
+  ssh -i $LINUX_SSH_PRIV_KEY $GENERIC_ADMIN_USERNAME@$LINUX_VM_PUBLIC_IP "curl -fsSL https://download.docker.com/linux/ubuntu/gpg | sudo apt-key add -"
+  ssh -i $LINUX_SSH_PRIV_KEY $GENERIC_ADMIN_USERNAME@$LINUX_VM_PUBLIC_IP "sudo add-apt-repository "deb [arch=amd64] https://download.docker.com/linux/ubuntu bionic stable""
+
+  ## VM Install software
+  echo "Installing Docker Software..."
+  ssh -i $LINUX_SSH_PRIV_KEY $GENERIC_ADMIN_USERNAME@$LINUX_VM_PUBLIC_IP "sudo apt update -y"
+  ssh -i $LINUX_SSH_PRIV_KEY $GENERIC_ADMIN_USERNAME@$LINUX_VM_PUBLIC_IP "sudo apt install docker-ce docker-ce-cli containerd.io -y"
 
   ## VM Install software
   echo "VM Install software"
@@ -2284,7 +2291,7 @@ do
         echo "What is the Cluster Name:"
         read -e AKS_CLUSTER_NAME
         dhcp_release
-      break;;
+        break;;
 	    "Helm Nginx Ingress Controller")
         az_login_check
         helm_nginx
