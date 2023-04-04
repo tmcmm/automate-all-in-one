@@ -2287,6 +2287,7 @@ do
         read -e AKS_CLUSTER_NAME
         echo "What is the VNET Name of your AKS:"
         read -e AKS_VNET_NAME
+        windows_dns
         break;;
       "DHCP Release")
         az_login_check
