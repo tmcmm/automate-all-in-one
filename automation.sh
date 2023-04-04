@@ -1759,7 +1759,7 @@ read -e SUBNET_NSG_NAME
  ## Public IP Create
 echo "Create Public IP"
 az network public-ip create \
-  --name $LINUX_VM_PUBLIC_IP_NAME \
+  --name $LINUX_SUBNET_VM_PUBLIC_IP_NAME \
   --resource-group $LINUX_RG_NAME \
   --debug
 ## VM Nic Create
@@ -1768,7 +1768,7 @@ az network nic create \
   --resource-group $LINUX_RG_NAME \
   --vnet-name $LINUX_VM_VNET_NAME \
   --subnet $LINUX_VM_SUBNET_NAME \
-  --name $LINUX_VM_NIC_NAME \
+  --name $LINUX_VM_SUBNET_NIC_NAME \
   --network-security-group $SUBNET_NSG_NAME \
   --debug
 
@@ -1776,9 +1776,9 @@ az network nic create \
 echo "Attach Public IP to VM NIC"
 az network nic ip-config update \
   --name $LINUX_VM_DEFAULT_IP_CONFIG \
-  --nic-name $LINUX_VM_NIC_NAME \
+  --nic-name $LINUX_VM_SUBNET_NIC_NAME \
   --resource-group $LINUX_RG_NAME \
-  --public-ip-address $LINUX_VM_PUBLIC_IP_NAME \
+  --public-ip-address $LINUX_SUBNET_VM_PUBLIC_IP_NAME \
   --debug
 
 ## Create VM
@@ -1786,7 +1786,7 @@ echo "Creating Virtual Machine...."
 az vm create \
   --resource-group $LINUX_RG_NAME \
   --authentication-type $LINUX_AUTH_TYPE \
-  --name $LINUX_VM_NAME \
+  --name $LINUX_VM_NAME_SUBNET \
   --computer-name $LINUX_VM_INTERNAL_NAME \
   --image $LINUX_VM_IMAGE \
   --size $LINUX_VM_SIZE \
@@ -1794,8 +1794,8 @@ az vm create \
   --ssh-key-values $ADMIN_USERNAME_SSH_KEYS_PUB \
   --storage-sku $LINUX_VM_STORAGE_SKU \
   --os-disk-size-gb $LINUX_VM_OS_DISK_SIZE \
-  --os-disk-name $LINUX_VM_OS_DISK_NAME \
-  --nics $LINUX_VM_NIC_NAME \
+  --os-disk-name $LINUX_DISK_NAME_SUBNET \
+  --nics $LINUX_VM_SUBNET_NIC_NAME \
   --tags $LINUX_TAGS \
   --debug 
 
@@ -1806,13 +1806,13 @@ az vm create \
   echo "Getting Public IP of VM"
   LINUX_VM_PUBLIC_IP=$(az network public-ip list \
     --resource-group $LINUX_RG_NAME \
-    --output json | jq -r ".[] | select ( .name == \"$LINUX_VM_PUBLIC_IP_NAME\" ) | [ .ipAddress ] | @tsv")
+    --output json | jq -r ".[] | select ( .name == \"$LINUX_SUBNET_VM_PUBLIC_IP_NAME\" ) | [ .ipAddress ] | @tsv")
   echo "Public IP of VM is:"
   echo $LINUX_VM_PUBLIC_IP
 
   ## Get Priv IP of Linux JS VM
   echo "Getting Linux VM Priv IP"
-  LINUX_PRIV_IP=$(az vm list-ip-addresses --resource-group $LINUX_RG_NAME --name $LINUX_VM_NAME --output json | jq -r ".[] | [ .virtualMachine.network.privateIpAddresses[0] ] | @tsv")
+  LINUX_PRIV_IP=$(az vm list-ip-addresses --resource-group $LINUX_RG_NAME --name $LINUX_VM_NAME_SUBNET --output json | jq -r ".[] | [ .virtualMachine.network.privateIpAddresses[0] ] | @tsv")
 
   ## Allow SSH from my Home
   echo "Update Subnet NSG to allow SSH"
@@ -1846,15 +1846,19 @@ az vm create \
   ssh-keygen -F $LINUX_VM_PUBLIC_IP >/dev/null | ssh-keyscan -H $LINUX_VM_PUBLIC_IP >> ~/.ssh/known_hosts
 
   ## Install and update software
-  echo "Updating VM and Stuff"
+  echo "Updating VM and installing required software"
   ssh -i $LINUX_SSH_PRIV_KEY $GENERIC_ADMIN_USERNAME@$LINUX_VM_PUBLIC_IP "sudo apt update && sudo apt upgrade -y"
-  ssh -i $LINUX_SSH_PRIV_KEY $GENERIC_ADMIN_USERNAME@$LINUX_VM_PUBLIC_IP "sudo apt-get install ca-certificates curl gnupg -y"
-  ssh -i $LINUX_SSH_PRIV_KEY $GENERIC_ADMIN_USERNAME@$LINUX_VM_PUBLIC_IP "curl -fsSL https://download.docker.com/linux/ubuntu/gpg | sudo apt-key add -"
-  ssh -i $LINUX_SSH_PRIV_KEY $GENERIC_ADMIN_USERNAME@$LINUX_VM_PUBLIC_IP "sudo add-apt-repository "deb [arch=amd64] https://download.docker.com/linux/ubuntu bionic stable""
 
-  ## VM Install software
+  echo "Installing ca-certificates curl gnupg:"
+  ssh -i $LINUX_SSH_PRIV_KEY $GENERIC_ADMIN_USERNAME@$LINUX_VM_PUBLIC_IP "sudo apt-get install ca-certificates curl gnupg -y"
+  echo "Adding Docker's official GPG key:"
+  ssh -i $LINUX_SSH_PRIV_KEY $GENERIC_ADMIN_USERNAME@$LINUX_VM_PUBLIC_IP "sudo mkdir -m 0755 -p /etc/apt/keyrings; curl -fsSL https://download.docker.com/linux/ubuntu/gpg | sudo gpg --dearmor -o /etc/apt/keyrings/docker.gpg"
+  echo "Setup docker's repository"
+  ssh -i $LINUX_SSH_PRIV_KEY $GENERIC_ADMIN_USERNAME@$LINUX_VM_PUBLIC_IP "echo "deb [arch="$(dpkg --print-architecture)" signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/ubuntu "$(. /etc/os-release && echo "$VERSION_CODENAME")" stable" | sudo tee /etc/apt/sources.list.d/docker.list > /dev/null"
+  
+    ## VM Install software
   echo "Installing Docker Software..."
-  ssh -i $LINUX_SSH_PRIV_KEY $GENERIC_ADMIN_USERNAME@$LINUX_VM_PUBLIC_IP "sudo apt update -y"
+  ssh -i $LINUX_SSH_PRIV_KEY $GENERIC_ADMIN_USERNAME@$LINUX_VM_PUBLIC_IP "sudo apt-get update -y"
   ssh -i $LINUX_SSH_PRIV_KEY $GENERIC_ADMIN_USERNAME@$LINUX_VM_PUBLIC_IP "sudo apt install docker-ce docker-ce-cli containerd.io -y"
 
   ## VM Install software
