@@ -124,7 +124,7 @@ WINDOWS_VM_SIZE="Standard_D4s_v3"
 WINDOWS_VM_STORAGE_SKU="Standard_LRS"
 WINDOWS_VM_OS_DISK_SIZE="130"
 WINDOWS_VM_TAGS="dns=brownbag"
-
+WIN_ZONE="emeabrownbag-win.containers"
 
 
 ## Linux DNS Parameters
@@ -151,4 +151,9 @@ LINUX_VM_DNS_PRIV_IP="$LINUX_VNET_2_OCTETS.7.4"
 VM_BIND_FORWARDERS_01="168.63.129.16"
 VM_BIND_FORWARDERS_02="1.1.1.1"
 
+## Zone parameters
+LIN_BIND_CONFIG_FILE_NAME="named.conf.options"
+LIN_ZONE_NAME="emeabrownbag-lin.containers"
+LIN_BIND_DNS_FILE_NAME="$ZONE_NAME.zone"
+LIN_ZONE_LOCAL_FILE="named.conf.local"
 

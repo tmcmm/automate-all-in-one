@@ -1540,16 +1540,11 @@ echo "Goood to go with Input Key Fingerprint"
 ssh-keygen -F $DNS_VM_PUBLIC_IP >/dev/null | ssh-keyscan -H $DNS_VM_PUBLIC_IP >> ~/.ssh/known_hosts
 
 
-BIND_CONFIG_FILE_NAME="named.conf.options"
-ZONE_NAME="emeacontainers.local"
-BIND_DNS_FILE_NAME="$ZONE_NAME.zone"
-ZONE_LOCAL_FILE="named.conf.local"
-
 echo "Write to Bind Config File "
 printf "
 logging {
           channel "misc" {
-                    file \"/var/log/named/misc.log\" versions 4 size 4m;
+                    file \"/var/named/bind9/misc.log\" versions 4 size 4m;
                     print-time YES;
                     print-severity YES;
                     print-category YES;
@@ -1594,14 +1589,14 @@ options {
         auth-nxdomain no;    # conform to RFC1035
         listen-on-v6 { any; };
 };
-" >> $BIND_CONFIG_FILE_NAME
+" >> $LIN_BIND_CONFIG_FILE_NAME
 
 
 
 echo "Write to Bind DNS Zone File "
 printf "
 \$TTL 86400
-@       IN      SOA     aks.$ZONE_NAME. admin.$ZONE_NAME. (
+@       IN      SOA     aks.$LIN_ZONE_NAME. admin.$LIN_ZONE_NAME. (
                         $(date +%Y%m%d)   ; Serial
                         3600              ; Refresh
                         1800              ; Retry
@@ -1609,10 +1604,11 @@ printf "
                         86400             ; Minimum TTL
                 )
 
-@       IN      NS      aks.$ZONE_NAME.
+@       IN      NS      aks.$LIN_ZONE_NAME.
 aks     IN      A       $LINUX_VM_DNS_PRIV_IP
-emea    IN      CNAME   aks.$ZONE_NAME.
-"  >> $BIND_DNS_FILE_NAME
+@       IN      A       5.6.7.8
+www     IN      CNAME   $LIN_ZONE_NAME.
+"  >> $LIN_BIND_DNS_FILE_NAME
 
 echo "Write to local dns zone file "
 printf "
@@ -1623,11 +1619,11 @@ printf "
 // organization
 //include "/etc/bind/zones.rfc1918";
 
-zone $ZONE_NAME {
+zone \"$LIN_ZONE_NAME\" {
     type master;
-    file $BIND_DNS_FILE_NAME;
+    file \"/etc/bind/$LIN_BIND_DNS_FILE_NAME\";
 };
-"  >> $ZONE_LOCAL_FILE
+"  >> $LIN_ZONE_LOCAL_FILE
 
 ## Update DNS Server VM
 echo "Update DNS Server VM and Install Bind9"
@@ -1706,8 +1702,7 @@ data:
         errors
         cache 15
         forward . $LINUX_VM_DNS_PRIV_IP
-    }   
-" >> $CORE_DNS_CONFIGMAP
+    }   " >> $CORE_DNS_CONFIGMAP
 
 echo "Cleaning up Bind Config File"
 rm -rf $BIND_CONFIG_FILE_NAME
@@ -2027,11 +2022,11 @@ az vm run-command invoke --resource-group $WINDOWS_RG_NAME --name $WINDOWS_VM_NA
    
 az vm run-command invoke --resource-group $WINDOWS_RG_NAME --name $WINDOWS_VM_NAME \
    --command-id RunPowerShellScript \
-   --scripts "Add-DnsServerPrimaryZone -Name 'containers.emea.bb' -ZoneFile 'containers.emea.bb.dns'"
+   --scripts "Add-DnsServerPrimaryZone -Name '$WIN_ZONE' -ZoneFile '$WIN_ZONE.dns'"
    
 az vm run-command invoke --resource-group $WINDOWS_RG_NAME --name $WINDOWS_VM_NAME \
    --command-id RunPowerShellScript \
-   --scripts "Add-DnsServerResourceRecordA -Name '@' -Ipv4address 1.2.3.4 -ZoneName 'containers.emea.bb' ; Add-DnsServerResourceRecordCName -Name 'www' -HostNameAlias 'containers.emea.bb' -ZoneName 'containers.emea.bb'"
+   --scripts "Add-DnsServerResourceRecordA -Name '@' -Ipv4address 1.2.3.4 -ZoneName '$WIN_ZONE' ; Add-DnsServerResourceRecordCName -Name 'www' -HostNameAlias '$WIN_ZONE' -ZoneName '$WIN_ZONE'"
    
 ### Change DNS server for AKS VNET
 echo "Changing $AKS_VNET_NAME DNS configuration"
