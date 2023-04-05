@@ -1697,7 +1697,7 @@ metadata:
   namespace: kube-system
 data:
   byodnsio.server: | 
-    $ZONE_NAME:53 {
+    $LIN_ZONE_NAME:53 {
         log 
         errors
         cache 15
