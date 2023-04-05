@@ -1591,8 +1591,6 @@ options {
 };
 " >> $LIN_BIND_CONFIG_FILE_NAME
 
-
-
 echo "Write to Bind DNS Zone File "
 printf "
 \$TTL 86400
@@ -1652,27 +1650,27 @@ ssh -i $SSH_PRIV_KEY $GENERIC_ADMIN_USERNAME@$DNS_VM_PUBLIC_IP "sudo chmod -R 77
 
 ## Copy Bind Config file to DNS Server
 echo "Copy Bind Config File to Remote DNS server"
-scp -i $SSH_PRIV_KEY $BIND_CONFIG_FILE_NAME $GENERIC_ADMIN_USERNAME@$DNS_VM_PUBLIC_IP:/tmp
+scp -i $SSH_PRIV_KEY $LIN_BIND_CONFIG_FILE_NAME $GENERIC_ADMIN_USERNAME@$DNS_VM_PUBLIC_IP:/tmp
 
 ## sudo cp options file to /etc/bind/
 echo "Copy the Bind File to /etc/bind"
-ssh -i $SSH_PRIV_KEY $GENERIC_ADMIN_USERNAME@$DNS_VM_PUBLIC_IP "sudo cp /tmp/$BIND_CONFIG_FILE_NAME /etc/bind"
+ssh -i $SSH_PRIV_KEY $GENERIC_ADMIN_USERNAME@$DNS_VM_PUBLIC_IP "sudo cp /tmp/$LIN_BIND_CONFIG_FILE_NAME /etc/bind"
 
 ## Copy Bind DNS file to DNS Server
 echo "Copy Bind DNS File to Remote DNS server"
-scp -i $SSH_PRIV_KEY $BIND_DNS_FILE_NAME $GENERIC_ADMIN_USERNAME@$DNS_VM_PUBLIC_IP:/tmp
+scp -i $SSH_PRIV_KEY $LIN_BIND_DNS_FILE_NAME $GENERIC_ADMIN_USERNAME@$DNS_VM_PUBLIC_IP:/tmp
 
 ## sudo cp options file to /etc/bind/
 echo "Copy the Bind File to /etc/bind"
-ssh -i $SSH_PRIV_KEY $GENERIC_ADMIN_USERNAME@$DNS_VM_PUBLIC_IP "sudo cp /tmp/$BIND_DNS_FILE_NAME /etc/bind"
+ssh -i $SSH_PRIV_KEY $GENERIC_ADMIN_USERNAME@$DNS_VM_PUBLIC_IP "sudo cp /tmp/$LIN_BIND_DNS_FILE_NAME /etc/bind"
 
 ## Copy Bind Config file to DNS Server
 echo "Copy Bind Config File to Remote DNS server"
-scp -i $SSH_PRIV_KEY $ZONE_LOCAL_FILE $GENERIC_ADMIN_USERNAME@$DNS_VM_PUBLIC_IP:/tmp
+scp -i $SSH_PRIV_KEY $LIN_ZONE_LOCAL_FILE $GENERIC_ADMIN_USERNAME@$DNS_VM_PUBLIC_IP:/tmp
 
 ## sudo cp options file to /etc/bind/
 echo "Copy the Bind File to /etc/bind"
-ssh -i $SSH_PRIV_KEY $GENERIC_ADMIN_USERNAME@$DNS_VM_PUBLIC_IP "sudo cp /tmp/$ZONE_LOCAL_FILE /etc/bind"
+ssh -i $SSH_PRIV_KEY $GENERIC_ADMIN_USERNAME@$DNS_VM_PUBLIC_IP "sudo cp /tmp/$LIN_ZONE_LOCAL_FILE /etc/bind"
 
 ## sudo systemctl stop bind9
 echo "Stop Bind9"
@@ -1705,13 +1703,13 @@ data:
     }   " >> $CORE_DNS_CONFIGMAP
 
 echo "Cleaning up Bind Config File"
-rm -rf $BIND_CONFIG_FILE_NAME
+rm -rf $LIN_BIND_CONFIG_FILE_NAME
 
 echo "Cleaning up Bind dns zone File"
-rm -rf $BIND_DNS_FILE_NAME
+rm -rf $LIN_BIND_DNS_FILE_NAME
 
 echo "Cleaning up Bind dns zone File"
-rm -rf $ZONE_LOCAL_FILE
+rm -rf $LIN_ZONE_LOCAL_FILE
 
 ## Get Credentials
 echo "Getting Cluster Credentials"

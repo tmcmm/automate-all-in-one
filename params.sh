@@ -154,6 +154,6 @@ VM_BIND_FORWARDERS_02="1.1.1.1"
 ## Zone parameters
 LIN_BIND_CONFIG_FILE_NAME="named.conf.options"
 LIN_ZONE_NAME="emeabrownbag-lin.containers"
-LIN_BIND_DNS_FILE_NAME="$ZONE_NAME.zone"
+LIN_BIND_DNS_FILE_NAME="$LIN_ZONE_NAME.zone"
 LIN_ZONE_LOCAL_FILE="named.conf.local"
 
