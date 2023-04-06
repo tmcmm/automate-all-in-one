@@ -1544,14 +1544,14 @@ echo "Write to Bind Config File "
 printf "
 logging {
           channel "misc" {
-                    file \"/var/named/bind9/misc.log\" versions 4 size 4m;
+                    file \"/var/log/named/misc.log\" versions 4 size 4m;
                     print-time YES;
                     print-severity YES;
                     print-category YES;
           };
   
           channel "query" {
-                    file \"/var/named/bind9/query.log\" versions 4 size 4m;
+                    file \"/var/log/named/query.log\" versions 4 size 4m;
                     print-time YES;
                     print-severity NO;
                     print-category NO;
@@ -1638,15 +1638,15 @@ ssh -i $SSH_PRIV_KEY $GENERIC_ADMIN_USERNAME@$DNS_VM_PUBLIC_IP "sudo cp /etc/bin
 
 ## Create Bind9 Logs folder
 echo "Create Bind9 Logs folder"
-ssh -i $SSH_PRIV_KEY $GENERIC_ADMIN_USERNAME@$DNS_VM_PUBLIC_IP "sudo mkdir -p /var/named/bind9"
+ssh -i $SSH_PRIV_KEY $GENERIC_ADMIN_USERNAME@$DNS_VM_PUBLIC_IP "sudo mkdir /var/log/named"
 
 ## Setup good permission in Bind9 Logs folder - change owner
 echo "Setup good permission in Bind9 Logs folder - change owner"
-ssh -i $SSH_PRIV_KEY $GENERIC_ADMIN_USERNAME@$DNS_VM_PUBLIC_IP "sudo chown -R bind:bind /var/named/bind9"
+ssh -i $SSH_PRIV_KEY $GENERIC_ADMIN_USERNAME@$DNS_VM_PUBLIC_IP "sudo chown -R bind:bind /var/log/named"
 
 ## Setup good permission in Bind9 Logs folder - change permissions
 echo "Setup good permission in Bind9 Logs folder - change permissions"
-ssh -i $SSH_PRIV_KEY $GENERIC_ADMIN_USERNAME@$DNS_VM_PUBLIC_IP "sudo chmod -R 775 /var/named/bind9"
+ssh -i $SSH_PRIV_KEY $GENERIC_ADMIN_USERNAME@$DNS_VM_PUBLIC_IP "sudo chmod -R 775 /var/log/named"
 
 ## Copy Bind Config file to DNS Server
 echo "Copy Bind Config File to Remote DNS server"
