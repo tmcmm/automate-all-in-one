@@ -102,7 +102,8 @@ function az_login_check () {
 
 # Check k8s version exists on location
 function check_k8s_version () {
-VERSION_EXIST=$(az aks get-versions -l $AKS_RG_LOCATION -ojson --query orchestrators[*].orchestratorVersion | jq -r ".[]" | grep $AKS_VERSION &>/dev/null; echo $?)
+VERSION_EXIST=$(az aks get-versions -l $AKS_RG_LOCATION -ojson --query values[*].patchVersions | jq 'map(values)[] | to_entries[] | {version: .key, upgrades: .value.upgrades}' | grep $AKS_VERSION &>/dev/null; echo $?)
+#VERSION_EXIST=$(az aks get-versions -l $AKS_RG_LOCATION -ojson --query orchestrators[*].orchestratorVersion | jq -r ".[]" | grep $AKS_VERSION &>/dev/null; echo $?)
 echo -e "\n--> Creating ${PURPOSE} cluster with Kubernetes version ${AKS_VERSION} on location ${AKS_RG_LOCATION}...\n"
 if [ $VERSION_EXIST -ne 0 ]
 then
