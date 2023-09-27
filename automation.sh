@@ -18,6 +18,7 @@ printf "|`tput bold` %-40s `tput sgr0`|\n" "Generate ssh key pair with"
 printf "|`tput bold` %-40s `tput sgr0`|\n" "ssh-keygen -o -t rsa -b 4096 -C email"
 printf "|`tput bold` %-40s `tput sgr0`|\n" "export ADMIN_USERNAME_SSH_KEYS_PUB"
 printf "|`tput bold` %-40s `tput sgr0`|\n" "export WINDOWS_ADMIN_PASSWORD"
+printf "|`tput bold` %-40s `tput sgr0`|\n" "export SUBID"
 
 sleep 2
 showHelp() {
@@ -44,7 +45,7 @@ EOF
 # Variable definition
 SCRIPT_PATH="$( cd "$(dirname "$0")" ; pwd -P )"
 SCRIPT_NAME="$(echo $0 | sed 's|\.\/||g')"
-SCRIPT_VERSION="Version v3.0 20230330"
+SCRIPT_VERSION="Version v3.0 20230922"
 
 # Load parameters
 set -e
@@ -219,6 +220,7 @@ if [[ $AKS_HAS_AZURE_MONITOR -eq 1 && $AKS_HAS_AUTO_SCALER -eq 1 && $AKS_HAS_MAN
   --nodepool-name sysnp \
   --nodepool-tags "env=sysnp" \
   --max-pods $AKS_MAX_PODS_PER_NODE \
+  --node-resource-group $AKS_NODE_RESOURCE_GROUP$PURPOSE \
   --zones $AKS_ZONES \
   --yes \
   --os-sku $OS_SKU \
@@ -252,6 +254,7 @@ elif [[ $AKS_HAS_AZURE_MONITOR -eq 1 && $AKS_HAS_AUTO_SCALER -eq 1 && $AKS_HAS_M
   --nodepool-name sysnp \
   --nodepool-tags "env=sysnp" \
   --max-pods $AKS_MAX_PODS_PER_NODE \
+  --node-resource-group $AKS_NODE_RESOURCE_GROUP-$PURPOSE \
   --zones $AKS_ZONES \
   --yes \
   --os-sku $OS_SKU \
@@ -282,6 +285,7 @@ elif [[ $AKS_HAS_AZURE_MONITOR -eq 1 && $AKS_HAS_AUTO_SCALER -eq 0 && $AKS_HAS_M
   --nodepool-name sysnp \
   --nodepool-tags "env=sysnp" \
   --max-pods $AKS_MAX_PODS_PER_NODE \
+  --node-resource-group $AKS_NODE_RESOURCE_GROUP-$PURPOSE \
   --zones $AKS_ZONES \
   --yes \
   --os-sku $OS_SKU \
@@ -316,6 +320,7 @@ elif [[ $AKS_HAS_AZURE_MONITOR -eq 1 && $AKS_HAS_AUTO_SCALER -eq 1 && $AKS_HAS_M
   --nodepool-name sysnp \
   --nodepool-tags "env=sysnp" \
   --max-pods $AKS_MAX_PODS_PER_NODE \
+  --node-resource-group $AKS_NODE_RESOURCE_GROUP-$PURPOSE \
   --zones $AKS_ZONES \
   --os-sku $OS_SKU \
   --debug
@@ -346,6 +351,7 @@ elif [[ $AKS_HAS_AZURE_MONITOR -eq 1 && $AKS_HAS_AUTO_SCALER -eq 0 && $AKS_HAS_M
   --nodepool-name sysnp \
   --nodepool-tags "env=sysnp" \
   --max-pods $AKS_MAX_PODS_PER_NODE \
+  --node-resource-group $AKS_NODE_RESOURCE_GROUP-$PURPOSE \
   --zones $AKS_ZONES \
   --os-sku $OS_SKU \
   --debug
@@ -374,6 +380,7 @@ elif [[ $AKS_HAS_AZURE_MONITOR -eq 0 && $AKS_HAS_AUTO_SCALER -eq 0 && $AKS_HAS_M
   --nodepool-name sysnp \
   --nodepool-tags "env=sysnp" \
   --max-pods $AKS_MAX_PODS_PER_NODE \
+  --node-resource-group $AKS_NODE_RESOURCE_GROUP-$PURPOSE \
   --zones $AKS_ZONES \
   --yes \
   --os-sku $OS_SKU \
@@ -435,6 +442,7 @@ elif [[ $AKS_HAS_AZURE_MONITOR -eq 1 && $AKS_HAS_AUTO_SCALER -eq 0 && $AKS_HAS_M
   --nodepool-name sysnp \
   --nodepool-tags "env=sysnp" \
   --max-pods $AKS_MAX_PODS_PER_NODE \
+  --node-resource-group $AKS_NODE_RESOURCE_GROUP-$PURPOSE \
   --zones $AKS_ZONES \
   --os-sku $OS_SKU \
   --debug
@@ -467,6 +475,7 @@ elif [[ $AKS_HAS_AZURE_MONITOR -eq 0 && $AKS_HAS_AUTO_SCALER -eq 1 && $AKS_HAS_M
   --nodepool-name sysnp \
   --nodepool-tags "env=sysnp" \
   --max-pods $AKS_MAX_PODS_PER_NODE \
+  --node-resource-group $AKS_NODE_RESOURCE_GROUP-$PURPOSE \
   --zones $AKS_ZONES \
   --yes \
   --os-sku $OS_SKU \
@@ -500,6 +509,7 @@ elif [[ $AKS_HAS_AZURE_MONITOR -eq 0 && $AKS_HAS_AUTO_SCALER -eq 1 && $AKS_HAS_M
   --nodepool-name sysnp \
   --nodepool-tags "env=sysnp" \
   --max-pods $AKS_MAX_PODS_PER_NODE \
+  --node-resource-group $AKS_NODE_RESOURCE_GROUP-$PURPOSE \
   --zones $AKS_ZONES \
   --yes \
   --os-sku $OS_SKU \
@@ -530,6 +540,7 @@ else
   --nodepool-name sysnp \
   --nodepool-tags "env=sysnp" \
   --max-pods $AKS_MAX_PODS_PER_NODE \
+  --node-resource-group $AKS_NODE_RESOURCE_GROUP-$PURPOSE \
   --zones $AKS_ZONES \
   --os-sku $OS_SKU \
   --debug
@@ -798,6 +809,7 @@ if [[ $AKS_HAS_AZURE_MONITOR -eq 1 && $AKS_HAS_AUTO_SCALER -eq 1 && $AKS_HAS_MAN
   --nodepool-name sysnp \
   --nodepool-tags "env=sysnp" \
   --max-pods $AKS_MAX_PODS_PER_NODE \
+  --node-resource-group $AKS_NODE_RESOURCE_GROUP-$PURPOSE \
   --enable-private-cluster \
   --yes \
   --debug 
@@ -829,6 +841,7 @@ elif [[ $AKS_HAS_AZURE_MONITOR -eq 1 && $AKS_HAS_AUTO_SCALER -eq 1 && $AKS_HAS_M
   --nodepool-name sysnp \
   --nodepool-tags "env=sysnp" \
   --max-pods $AKS_MAX_PODS_PER_NODE \
+  --node-resource-group $AKS_NODE_RESOURCE_GROUP-$PURPOSE \
   --enable-private-cluster \
   --yes \
   --debug
@@ -857,6 +870,7 @@ elif [[ $AKS_HAS_AZURE_MONITOR -eq 1 && $AKS_HAS_AUTO_SCALER -eq 0 && $AKS_HAS_M
   --nodepool-name sysnp \
   --nodepool-tags "env=sysnp" \
   --max-pods $AKS_MAX_PODS_PER_NODE \
+  --node-resource-group $AKS_NODE_RESOURCE_GROUP-$PURPOSE \
   --enable-private-cluster \
   --yes \
   --debug  
@@ -889,6 +903,7 @@ elif [[ $AKS_HAS_AZURE_MONITOR -eq 1 && $AKS_HAS_AUTO_SCALER -eq 1 && $AKS_HAS_M
   --nodepool-name sysnp \
   --nodepool-tags "env=sysnp" \
   --max-pods $AKS_MAX_PODS_PER_NODE \
+  --node-resource-group $AKS_NODE_RESOURCE_GROUP-$PURPOSE \
   --enable-private-cluster \
   --debug
 elif [[ $AKS_HAS_AZURE_MONITOR -eq 1 && $AKS_HAS_AUTO_SCALER -eq 0 && $AKS_HAS_MANAGED_IDENTITY -eq 0 && $AKS_HAS_NETWORK_POLICY -eq 0 ]]; then
@@ -917,6 +932,7 @@ elif [[ $AKS_HAS_AZURE_MONITOR -eq 1 && $AKS_HAS_AUTO_SCALER -eq 0 && $AKS_HAS_M
   --nodepool-name sysnp \
   --nodepool-tags "env=sysnp" \
   --max-pods $AKS_MAX_PODS_PER_NODE \
+  --node-resource-group $AKS_NODE_RESOURCE_GROUP-$PURPOSE \
   --enable-private-cluster \
   --debug
 elif [[ $AKS_HAS_AZURE_MONITOR -eq 0 && $AKS_HAS_AUTO_SCALER -eq 0 && $AKS_HAS_MANAGED_IDENTITY -eq 1 && $AKS_HAS_NETWORK_POLICY -eq 0 ]]; then
@@ -943,6 +959,7 @@ elif [[ $AKS_HAS_AZURE_MONITOR -eq 0 && $AKS_HAS_AUTO_SCALER -eq 0 && $AKS_HAS_M
   --nodepool-name sysnp \
   --nodepool-tags "env=sysnp" \
   --max-pods $AKS_MAX_PODS_PER_NODE \
+  --node-resource-group $AKS_NODE_RESOURCE_GROUP-$PURPOSE \
   --enable-private-cluster \
   --yes \
   --debug
@@ -971,6 +988,7 @@ elif [[ $AKS_HAS_AZURE_MONITOR -eq 0 && $AKS_HAS_AUTO_SCALER -eq 0 && $AKS_HAS_M
   --nodepool-name sysnp \
   --nodepool-tags "env=sysnp" \
   --max-pods $AKS_MAX_PODS_PER_NODE \
+  --node-resource-group $AKS_NODE_RESOURCE_GROUP-$PURPOSE \
   --enable-private-cluster \
   --yes \
   --debug
@@ -1000,6 +1018,7 @@ elif [[ $AKS_HAS_AZURE_MONITOR -eq 1 && $AKS_HAS_AUTO_SCALER -eq 0 && $AKS_HAS_M
   --nodepool-name sysnp \
   --nodepool-tags "env=sysnp" \
   --max-pods $AKS_MAX_PODS_PER_NODE \
+  --node-resource-group $AKS_NODE_RESOURCE_GROUP-$PURPOSE \
   --enable-private-cluster \
   --debug
 elif [[ $AKS_HAS_AZURE_MONITOR -eq 0 && $AKS_HAS_AUTO_SCALER -eq 1 && $AKS_HAS_MANAGED_IDENTITY -eq 0 && $AKS_HAS_NETWORK_POLICY -eq 0 ]]; then
@@ -1030,6 +1049,7 @@ elif [[ $AKS_HAS_AZURE_MONITOR -eq 0 && $AKS_HAS_AUTO_SCALER -eq 1 && $AKS_HAS_M
   --nodepool-name sysnp \
   --nodepool-tags "env=sysnp" \
   --max-pods $AKS_MAX_PODS_PER_NODE \
+  --node-resource-group $AKS_NODE_RESOURCE_GROUP-$PURPOSE \
   --enable-private-cluster \
   --yes \
   --debug
@@ -1061,6 +1081,7 @@ elif [[ $AKS_HAS_AZURE_MONITOR -eq 0 && $AKS_HAS_AUTO_SCALER -eq 1 && $AKS_HAS_M
   --nodepool-name sysnp \
   --nodepool-tags "env=sysnp" \
   --max-pods $AKS_MAX_PODS_PER_NODE \
+  --node-resource-group $AKS_NODE_RESOURCE_GROUP-$PURPOSE \
   --enable-private-cluster \
   --yes \
   --debug
@@ -1089,6 +1110,7 @@ else
   --nodepool-name sysnp \
   --nodepool-tags "env=sysnp" \
   --max-pods $AKS_MAX_PODS_PER_NODE \
+  --node-resource-group $AKS_NODE_RESOURCE_GROUP-$PURPOSE \
   --enable-private-cluster \
   --debug
 fi
@@ -1376,7 +1398,9 @@ then
   ssh -i $SSH_PRIV_KEY $GENERIC_ADMIN_USERNAME@$VM_PUBLIC_IP "touch ~/win-pass.txt && echo "$WINDOWS_AKS_ADMIN_PASSWORD" > ~/win-pass.txt"
 
   ## Get Credentials
-  echo "Add Kubectl completion"
+  echo "Get Cluster credentials"
+  ssh -i $SSH_PRIV_KEY $GENERIC_ADMIN_USERNAME@$VM_PUBLIC_IP "az login --use-device"
+  ssh -i $SSH_PRIV_KEY $GENERIC_ADMIN_USERNAME@$VM_PUBLIC_IP "az account set --subscription $SUBID"
   ssh -i $SSH_PRIV_KEY $GENERIC_ADMIN_USERNAME@$VM_PUBLIC_IP "az aks get-credentials --resource-group $AKS_RG_NAME --name $AKS_CLUSTER_NAME"
   
   echo "Public IP of the VM"
@@ -2187,7 +2211,7 @@ echo "Getting Cluster Credentials"
 az aks get-credentials --resource-group $AKS_RG_NAME --name $AKS_CLUSTER_NAME --overwrite-existing
 
 ## Add the ingress-nginx repository
-echo "Add IngController Helm Repo"
+echo "Add Ingress Controller Helm Repo"
 helm repo add ingress-nginx https://kubernetes.github.io/ingress-nginx
 
 ## Install 
@@ -2232,7 +2256,100 @@ kubectl apply -f app-ingress.yaml --namespace ingress-basic
 
 }
 
-options=("Azure Cluster" "Kubenet Cluster" "Private Cluster" "List existing AKS Clusters" "Create Linux VM on Subnet" "Linux DNS VM" "Windows DNS VM" "DHCP Release" "Helm Nginx Ingress Controller" "Destroy Environment" "Quit")
+
+function agic_brownfield (){
+
+echo -e "\n--> Warning: You must target a public faced cluster or run the script from the Jump Server in case its private\n"  
+echo -e "\n--> Brownfield assumes that you have already an existing AKS cluster\n"
+echo "What is the Resource Group of your Cluster:"
+read -e AKS_RG_NAME
+echo "What is the Cluster Name:"
+read -e AKS_CLUSTER_NAME
+echo "What is the Resource Group where you want to deploy your App Gateway?"
+read -e APPGTW_RG_NAME
+
+echo "Creating the Resource Group for APP Gateway Resource..."
+az group create \
+  --name $APPGTW_RG_NAME \
+  --location $AKS_RG_LOCATION \
+  --tags env=agic \
+  --debug
+
+echo "Creating the Public IP Address for the App Gateway..."
+az network public-ip create \
+  --name $APPGTW_PIP_NAME \
+  --resource-group $APPGTW_RG_NAME \
+  --allocation-method Static \
+  --sku Standard
+
+echo "Sleeping 30s - Allow time for Public IP"
+countdown "00:00:30"
+
+echo "Creating the VNET and Subnet for App Gateway..."
+az network vnet create \
+  --name $APPGTW_VNET_NAME \
+  --resource-group $APPGTW_RG_NAME \
+  --address-prefix $APPGTW_VNET_CIDR \
+  --subnet-name $APPGTW_SNET_NAME \
+  --subnet-prefix $APPGTW_SNET_CIDR
+
+echo "Creating the App Gateway Resource..."
+az network application-gateway create \
+  --name $APPGTW_NAME \
+  --resource-group $APPGTW_RG_NAME \
+  --sku Standard_v2 \
+  --public-ip-address $APPGTW_PIP_NAME \
+  --vnet-name $APPGTW_VNET_NAME \
+  --subnet $APPGTW_SNET_NAME \
+  --priority 100 \
+  --debug \
+  --verbose
+
+echo "Sleeping 30secs - Allow time for App Gateway to be created"
+countdown "00:00:30"
+
+
+APP_GTW_ID=$(az network application-gateway show --name $APPGTW_NAME --resource-group $APPGTW_RG_NAME -o tsv --query "id")
+
+echo "App Gateway is created on $APP_GTW_ID"
+
+echo "Enabling AGIC addon on the AKS cluster..."
+
+az aks enable-addons --name $AKS_CLUSTER_NAME --resource-group $AKS_RG_NAME -a ingress-appgw --appgw-id $APP_GTW_ID
+
+echo "Sleeping 30s - Allow time for addon to be enabled IP"
+countdown "00:00:30"
+
+echo "Peer the two VNETs together..."
+
+$NODE_RESOURCE_GROUP=$(az aks show --name $AKS_CLUSTER_NAME --resource-group $AKS_RG_NAME -o tsv --query "nodeResourceGroup")
+
+$AKS_VNET=$(az network vnet list --resource-group $NODE_RESOURCE_GROUP -o tsv --query "[0].name")
+
+AKS_VNET_ID=$(az network vnet show --name $AKS_VNET --resource-group $NODE_RESOURCE_GROUP -o tsv --query "id")
+
+az network vnet peering create \
+  --name AppGWtoAKSVnetPeering \
+  --resource-group $APPGTW_RG_NAME \
+  --vnet-name $APPGTW_VNET_NAME \
+  --remote-vnet $APPGTW_VNET_NAME \
+  --allow-vnet-access
+
+APP_GTW_VNET_ID=$(az network vnet show --name APPGTW_VNET_NAME --resource-group APPGTW_RG_NAME -o tsv --query "id")
+
+az network vnet peering create \
+  --name AKStoAppGWVnetPeering \
+  --resource-group $NODE_RESOURCE_GROUP\
+  --vnet-name $AKS_VNET \
+  --remote-vnet $APP_GTW_VNET_ID\
+  --allow-vnet-access
+
+
+printf "|`tput bold` %-40s `tput sgr0`|\n" "In case you have an existing AKS cluster using Kubenet mode you need to update the route table to help the packets destined for a POD IP reach the node which is hosting the pod. A simple way to achieve this is by associating the same route table created by AKS to the Application Gateway's subnet."
+
+}
+
+options=("Azure Cluster" "Kubenet Cluster" "Private Cluster" "List existing AKS Clusters" "Create Linux VM on Subnet" "Linux DNS VM" "Windows DNS VM" "DHCP Release" "Helm Nginx Ingress Controller" "AGIC-Brownfield" "Destroy Environment" "Quit")
 select opt in "${options[@]}"
 do    
 	case $opt in
@@ -2294,6 +2411,10 @@ do
 	    "Helm Nginx Ingress Controller")
         az_login_check
         helm_nginx
+        break;;
+	    "AGIC-Brownfield")
+        az_login_check
+        agic_brownfield
         break;;
 	    "Destroy Environment")
         az_login_check

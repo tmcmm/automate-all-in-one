@@ -5,6 +5,7 @@ AKS_VERSION="1.24.9"
 AKS_VNET_2_OCTETS="10.4"   # Define the fisrt 2 octets for Vnet
 LINUX_VNET_2_OCTETS="10.5" # Define the fisrt 2 octets for Linux Vnet
 WINDOWS_VNET_2_OCTETS="10.6" # Define the fisrt 2 octets for Windows Vnet
+APPGTW_VNET_2_OCTETS="10.7" # Define the fisrt 2 octets for Windows Vnet
 AKS_ZONES="1 2 3"          # Define AKS Zones
 AKS_2ND_NP_ZONES="1 2 3"   # Defines NP Zones
 
@@ -15,6 +16,15 @@ AKS_CLUSTER_SRV_CIDR="$AKS_VNET_2_OCTETS.2.0/24"
 AKS_CLUSTER_DNS="$AKS_VNET_2_OCTETS.2.10"
 AKS_CLUSTER_DOCKER_BRIDGE="172.17.0.1/16"
 
+## APP Gateway Vnet Settings
+APPGTW_VNET_CIDR="$APPGTW_VNET_2_OCTETS.0.0/16"
+APPGTW_SNET_CIDR="$APPGTW_VNET_2_OCTETS.0.0/23"
+APPGTW_VNET_NAME="appgateway-vnet"
+APPGTW_SNET_NAME="appgateway-snet"
+
+## APP Gateway General
+APPGTW_PIP_NAME="appgtw-pip"
+APPGTW_NAME="appgtw"
 
 ## AKS Add-ons and other options
 AKS_HAS_AZURE_MONITOR="0"     # 1 = AKS has Az Mon enabled
@@ -33,6 +43,7 @@ EXISTING_JUMP_SERVER_VNET_NAME="vnet-vm-jpsrv"
 ## AKS Specifics
 AKS_RG_NAME="rg-aks"
 AKS_CLUSTER_NAME="aks"
+AKS_NODE_RESOURCE_GROUP="MC_NODERG-"$AKS_RG_LOCATION
 AKS_SYS_NP_NODE_SIZE="Standard_D4s_v3"
 AKS_USR_NP_NODE_SIZE="Standard_D4s_v3"
 AKS_SYS_NP_NODE_COUNT="1"
