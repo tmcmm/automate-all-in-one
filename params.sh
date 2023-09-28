@@ -136,6 +136,7 @@ WINDOWS_VM_STORAGE_SKU="Standard_LRS"
 WINDOWS_VM_OS_DISK_SIZE="130"
 WINDOWS_VM_TAGS="dns=brownbag"
 WIN_ZONE="emeabrownbag-win.containers"
+WIN_A_RECORD_IP="104.214.228.93"
 
 
 ## Linux DNS Parameters

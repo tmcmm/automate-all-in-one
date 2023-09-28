@@ -2049,7 +2049,7 @@ az vm run-command invoke --resource-group $WINDOWS_RG_NAME --name $WINDOWS_VM_NA
    
 az vm run-command invoke --resource-group $WINDOWS_RG_NAME --name $WINDOWS_VM_NAME \
    --command-id RunPowerShellScript \
-   --scripts "Add-DnsServerResourceRecordA -Name '@' -Ipv4address 1.2.3.4 -ZoneName '$WIN_ZONE' ; Add-DnsServerResourceRecordCName -Name 'www' -HostNameAlias '$WIN_ZONE' -ZoneName '$WIN_ZONE'"
+   --scripts "Add-DnsServerResourceRecordA -Name '@' -Ipv4address '$WIN_A_RECORD_IP' -ZoneName '$WIN_ZONE' ; Add-DnsServerResourceRecordCName -Name 'www' -HostNameAlias '$WIN_ZONE' -ZoneName '$WIN_ZONE'"
    
 ### Change DNS server for AKS VNET
 echo "Changing $AKS_VNET_NAME DNS configuration"
@@ -2059,6 +2059,8 @@ az network vnet update --resource-group $AKS_RG_NAME --name $AKS_VNET_NAME --dns
 echo "Sleeping 10s - Allow time for DNS Servers to be changed at VNET Level"
 countdown "00:00:10"
 
+
+printf "|`tput bold` %-40s `tput sgr0`|\n" "After changing the DNS server at VNET level you will need to perform a DHCP_Release on the nodes so trigger the script again and choose option 8"
 }
 
 function dhcp_release() {
@@ -2070,7 +2072,7 @@ for vmssName in "${NODE_INSTANCES_NAME[@]}"
 do
     #  Perform DHCP release for each of the vmss instance
     echo "Performing DHCP release for each $vmssName instance"
-    az vmss list-instances --resource-group  $NODE_RESOURCE_GROUP --name $vmssName --query "[].id" --output tsv | az vmss run-command invoke --scripts "grep nameserver /etc/resolv.conf || { dhclient -x; dhclient -i eth0; sleep 10; pkill dhclient; grep nameserver /etc/resolv.conf; }" --command-id RunShellScript --ids @-
+    az vmss list-instances --resource-group  $NODE_RESOURCE_GROUP --name $vmssName --query "[].id" --output tsv | az vmss run-command invoke --scripts "{ dhclient -x; dhclient -i eth0; sleep 10; pkill dhclient; grep nameserver /etc/resolv.conf; }" --command-id RunShellScript --ids @-
 done
 }
 
