@@ -2322,26 +2322,25 @@ countdown "00:00:30"
 
 echo "Peer the two VNETs together..."
 
-NODE_RESOURCE_GROUP=$(az aks show --name $AKS_CLUSTER_NAME --resource-group $AKS_RG_NAME -o tsv --query "nodeResourceGroup")
 
-AKS_VNET=$(az network vnet list --resource-group $NODE_RESOURCE_GROUP -o tsv --query "[0].name")
+AKS_VNET=$(az network vnet list --resource-group $AKS_RG_NAME -o tsv --query "[0].name")
 
-AKS_VNET_ID=$(az network vnet show --name $AKS_VNET --resource-group $NODE_RESOURCE_GROUP -o tsv --query "id")
+AKS_VNET_ID=$(az network vnet show --name $AKS_VNET --resource-group $AKS_RG_NAME -o tsv --query "id")
 
 az network vnet peering create \
   --name AppGWtoAKSVnetPeering \
   --resource-group $APPGTW_RG_NAME \
   --vnet-name $APPGTW_VNET_NAME \
-  --remote-vnet $APPGTW_VNET_NAME \
+  --remote-vnet $AKS_VNET_ID \
   --allow-vnet-access
 
 APP_GTW_VNET_ID=$(az network vnet show --name $APPGTW_VNET_NAME --resource-group $APPGTW_RG_NAME -o tsv --query "id")
 
 az network vnet peering create \
   --name AKStoAppGWVnetPeering \
-  --resource-group $NODE_RESOURCE_GROUP\
+  --resource-group $AKS_RG_NAME \
   --vnet-name $AKS_VNET \
-  --remote-vnet $APP_GTW_VNET_ID\
+  --remote-vnet $APP_GTW_VNET_ID \
   --allow-vnet-access
 
 
