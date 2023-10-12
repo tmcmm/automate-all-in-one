@@ -2198,6 +2198,57 @@ printTable ',' $AKS_STATUS_LIST
 
 }
 
+function helm_nginx_internal(){
+
+echo -e "\n--> Warning: You must target a public faced cluster or run the script from the Jump Server in case its private\n"
+echo -e "\n--> ......Installing Helm.....\n"
+curl https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3 | bash
+echo "What is the Resource Group of your Cluster:"
+read -e AKS_RG_NAME
+echo "What is the Cluster Name:"
+read -e AKS_CLUSTER_NAME
+
+## Get Credentials
+echo "Getting Cluster Credentials"
+az aks get-credentials --resource-group $AKS_RG_NAME --name $AKS_CLUSTER_NAME --overwrite-existing
+
+## Add the ingress-nginx repository
+echo "Add Ingress Controller Helm Repo"
+helm repo add ingress-nginx https://kubernetes.github.io/ingress-nginx
+
+## Install 
+echo "Install Nginx Ingress"
+helm install nginx-ingress ingress-nginx/ingress-nginx \
+    --namespace ingress-basic --create-namespace \
+    --set controller.replicaCount=2 \
+    --set controller.nodeSelector."kubernetes\.io/os"=linux \
+    --set controller.image.digest="" \
+    --set controller.admissionWebhooks.patch.nodeSelector."kubernetes\.io/os"=linux \
+    --set controller.admissionWebhooks.patch.image.digest="" \
+    --set defaultBackend.nodeSelector."kubernetes\.io/os"=linux \
+    --set defaultBackend.image.digest="" \
+    --set controller.service.annotations."service\.beta\.kubernetes\.io/azure-load-balancer-internal"=true \
+    --set controller.service.annotations."service\.beta\.kubernetes\.io/azure-load-balancer-health-probe-request-path"=/healthz
+
+
+## Get PIP of LB
+echo "Get PIP of LB"
+LB_PIP=$(kubectl get svc -A -n nginx-ingress-ingress-nginx-controller --no-headers -o json | jq -r '.items[].status.loadBalancer.ingress[]?.ip' | wc -l)
+
+while [[ "$LB_PIP" = "0" ]]
+do
+    echo "not good to go: $LB_PIP"
+    echo "Sleeping for 5s..."
+    sleep 5
+    LB_PIP=$(kubectl get svc -A -n nginx-ingress-ingress-nginx-controller --no-headers -o json | jq -r '.items[].status.loadBalancer.ingress[]?.ip' | wc -l)
+done
+
+echo "Go to go with LB PIP"
+LB_PIP=$(kubectl get svc -A -n nginx-ingress-ingress-nginx-controller --no-headers -o json | jq -r '.items[].status.loadBalancer.ingress[]?.ip')
+echo "LB PIP is: $LB_PIP"
+}
+
+
 function helm_nginx (){
 
 echo -e "\n--> Warning: You must target a public faced cluster or run the script from the Jump Server in case its private\n"
@@ -2350,7 +2401,7 @@ printf "|`tput bold` %-40s `tput sgr0`|\n" "In case you have an existing AKS clu
 
 }
 
-options=("Azure Cluster" "Kubenet Cluster" "Private Cluster" "List existing AKS Clusters" "Create Linux VM on Subnet" "Linux DNS VM" "Windows DNS VM" "DHCP Release" "Helm Nginx Ingress Controller" "AGIC-Brownfield" "Destroy Environment" "Quit")
+options=("Azure Cluster" "Kubenet Cluster" "Private Cluster" "List existing AKS Clusters" "Create Linux VM on Subnet" "Linux DNS VM" "Windows DNS VM" "DHCP Release" "Helm Nginx Ingress Controller" "Helm Nginx Ingress Controller-Internal" "AGIC-Brownfield" "Destroy Environment" "Quit")
 select opt in "${options[@]}"
 do    
 	case $opt in
@@ -2412,6 +2463,10 @@ do
 	    "Helm Nginx Ingress Controller")
         az_login_check
         helm_nginx
+        break;;
+	    "Helm Nginx Ingress Controller-Internal")
+        az_login_check
+        helm_nginx_internal
         break;;
 	    "AGIC-Brownfield")
         az_login_check
