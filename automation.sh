@@ -18,6 +18,7 @@ printf "|`tput bold` %-40s `tput sgr0`|\n" "Generate ssh key pair with"
 printf "|`tput bold` %-40s `tput sgr0`|\n" "ssh-keygen -o -t rsa -b 4096 -C email"
 printf "|`tput bold` %-40s `tput sgr0`|\n" "export ADMIN_USERNAME_SSH_KEYS_PUB"
 printf "|`tput bold` %-40s `tput sgr0`|\n" "export WINDOWS_ADMIN_PASSWORD"
+printf "|`tput bold` %-40s `tput sgr0`|\n" "export SUBID"
 
 sleep 2
 showHelp() {
@@ -44,7 +45,7 @@ EOF
 # Variable definition
 SCRIPT_PATH="$( cd "$(dirname "$0")" ; pwd -P )"
 SCRIPT_NAME="$(echo $0 | sed 's|\.\/||g')"
-SCRIPT_VERSION="Version v3.0 20230330"
+SCRIPT_VERSION="Version v3.0 20230922"
 
 # Load parameters
 set -e
@@ -102,7 +103,8 @@ function az_login_check () {
 
 # Check k8s version exists on location
 function check_k8s_version () {
-VERSION_EXIST=$(az aks get-versions -l $AKS_RG_LOCATION -ojson --query orchestrators[*].orchestratorVersion | jq -r ".[]" | grep $AKS_VERSION &>/dev/null; echo $?)
+VERSION_EXIST=$(az aks get-versions -l $AKS_RG_LOCATION -ojson --query values[*].patchVersions | jq 'map(values)[] | to_entries[] | {version: .key, upgrades: .value.upgrades}' | grep $AKS_VERSION &>/dev/null; echo $?)
+#VERSION_EXIST=$(az aks get-versions -l $AKS_RG_LOCATION -ojson --query orchestrators[*].orchestratorVersion | jq -r ".[]" | grep $AKS_VERSION &>/dev/null; echo $?)
 echo -e "\n--> Creating ${PURPOSE} cluster with Kubernetes version ${AKS_VERSION} on location ${AKS_RG_LOCATION}...\n"
 if [ $VERSION_EXIST -ne 0 ]
 then
@@ -218,6 +220,7 @@ if [[ $AKS_HAS_AZURE_MONITOR -eq 1 && $AKS_HAS_AUTO_SCALER -eq 1 && $AKS_HAS_MAN
   --nodepool-name sysnp \
   --nodepool-tags "env=sysnp" \
   --max-pods $AKS_MAX_PODS_PER_NODE \
+  --node-resource-group $AKS_NODE_RESOURCE_GROUP$PURPOSE \
   --zones $AKS_ZONES \
   --yes \
   --os-sku $OS_SKU \
@@ -251,6 +254,7 @@ elif [[ $AKS_HAS_AZURE_MONITOR -eq 1 && $AKS_HAS_AUTO_SCALER -eq 1 && $AKS_HAS_M
   --nodepool-name sysnp \
   --nodepool-tags "env=sysnp" \
   --max-pods $AKS_MAX_PODS_PER_NODE \
+  --node-resource-group $AKS_NODE_RESOURCE_GROUP-$PURPOSE \
   --zones $AKS_ZONES \
   --yes \
   --os-sku $OS_SKU \
@@ -281,6 +285,7 @@ elif [[ $AKS_HAS_AZURE_MONITOR -eq 1 && $AKS_HAS_AUTO_SCALER -eq 0 && $AKS_HAS_M
   --nodepool-name sysnp \
   --nodepool-tags "env=sysnp" \
   --max-pods $AKS_MAX_PODS_PER_NODE \
+  --node-resource-group $AKS_NODE_RESOURCE_GROUP-$PURPOSE \
   --zones $AKS_ZONES \
   --yes \
   --os-sku $OS_SKU \
@@ -315,6 +320,7 @@ elif [[ $AKS_HAS_AZURE_MONITOR -eq 1 && $AKS_HAS_AUTO_SCALER -eq 1 && $AKS_HAS_M
   --nodepool-name sysnp \
   --nodepool-tags "env=sysnp" \
   --max-pods $AKS_MAX_PODS_PER_NODE \
+  --node-resource-group $AKS_NODE_RESOURCE_GROUP-$PURPOSE \
   --zones $AKS_ZONES \
   --os-sku $OS_SKU \
   --debug
@@ -345,6 +351,7 @@ elif [[ $AKS_HAS_AZURE_MONITOR -eq 1 && $AKS_HAS_AUTO_SCALER -eq 0 && $AKS_HAS_M
   --nodepool-name sysnp \
   --nodepool-tags "env=sysnp" \
   --max-pods $AKS_MAX_PODS_PER_NODE \
+  --node-resource-group $AKS_NODE_RESOURCE_GROUP-$PURPOSE \
   --zones $AKS_ZONES \
   --os-sku $OS_SKU \
   --debug
@@ -373,6 +380,7 @@ elif [[ $AKS_HAS_AZURE_MONITOR -eq 0 && $AKS_HAS_AUTO_SCALER -eq 0 && $AKS_HAS_M
   --nodepool-name sysnp \
   --nodepool-tags "env=sysnp" \
   --max-pods $AKS_MAX_PODS_PER_NODE \
+  --node-resource-group $AKS_NODE_RESOURCE_GROUP-$PURPOSE \
   --zones $AKS_ZONES \
   --yes \
   --os-sku $OS_SKU \
@@ -434,6 +442,7 @@ elif [[ $AKS_HAS_AZURE_MONITOR -eq 1 && $AKS_HAS_AUTO_SCALER -eq 0 && $AKS_HAS_M
   --nodepool-name sysnp \
   --nodepool-tags "env=sysnp" \
   --max-pods $AKS_MAX_PODS_PER_NODE \
+  --node-resource-group $AKS_NODE_RESOURCE_GROUP-$PURPOSE \
   --zones $AKS_ZONES \
   --os-sku $OS_SKU \
   --debug
@@ -466,6 +475,7 @@ elif [[ $AKS_HAS_AZURE_MONITOR -eq 0 && $AKS_HAS_AUTO_SCALER -eq 1 && $AKS_HAS_M
   --nodepool-name sysnp \
   --nodepool-tags "env=sysnp" \
   --max-pods $AKS_MAX_PODS_PER_NODE \
+  --node-resource-group $AKS_NODE_RESOURCE_GROUP-$PURPOSE \
   --zones $AKS_ZONES \
   --yes \
   --os-sku $OS_SKU \
@@ -499,6 +509,7 @@ elif [[ $AKS_HAS_AZURE_MONITOR -eq 0 && $AKS_HAS_AUTO_SCALER -eq 1 && $AKS_HAS_M
   --nodepool-name sysnp \
   --nodepool-tags "env=sysnp" \
   --max-pods $AKS_MAX_PODS_PER_NODE \
+  --node-resource-group $AKS_NODE_RESOURCE_GROUP-$PURPOSE \
   --zones $AKS_ZONES \
   --yes \
   --os-sku $OS_SKU \
@@ -529,6 +540,7 @@ else
   --nodepool-name sysnp \
   --nodepool-tags "env=sysnp" \
   --max-pods $AKS_MAX_PODS_PER_NODE \
+  --node-resource-group $AKS_NODE_RESOURCE_GROUP-$PURPOSE \
   --zones $AKS_ZONES \
   --os-sku $OS_SKU \
   --debug
@@ -797,6 +809,7 @@ if [[ $AKS_HAS_AZURE_MONITOR -eq 1 && $AKS_HAS_AUTO_SCALER -eq 1 && $AKS_HAS_MAN
   --nodepool-name sysnp \
   --nodepool-tags "env=sysnp" \
   --max-pods $AKS_MAX_PODS_PER_NODE \
+  --node-resource-group $AKS_NODE_RESOURCE_GROUP-$PURPOSE \
   --enable-private-cluster \
   --yes \
   --debug 
@@ -828,6 +841,7 @@ elif [[ $AKS_HAS_AZURE_MONITOR -eq 1 && $AKS_HAS_AUTO_SCALER -eq 1 && $AKS_HAS_M
   --nodepool-name sysnp \
   --nodepool-tags "env=sysnp" \
   --max-pods $AKS_MAX_PODS_PER_NODE \
+  --node-resource-group $AKS_NODE_RESOURCE_GROUP-$PURPOSE \
   --enable-private-cluster \
   --yes \
   --debug
@@ -856,6 +870,7 @@ elif [[ $AKS_HAS_AZURE_MONITOR -eq 1 && $AKS_HAS_AUTO_SCALER -eq 0 && $AKS_HAS_M
   --nodepool-name sysnp \
   --nodepool-tags "env=sysnp" \
   --max-pods $AKS_MAX_PODS_PER_NODE \
+  --node-resource-group $AKS_NODE_RESOURCE_GROUP-$PURPOSE \
   --enable-private-cluster \
   --yes \
   --debug  
@@ -888,6 +903,7 @@ elif [[ $AKS_HAS_AZURE_MONITOR -eq 1 && $AKS_HAS_AUTO_SCALER -eq 1 && $AKS_HAS_M
   --nodepool-name sysnp \
   --nodepool-tags "env=sysnp" \
   --max-pods $AKS_MAX_PODS_PER_NODE \
+  --node-resource-group $AKS_NODE_RESOURCE_GROUP-$PURPOSE \
   --enable-private-cluster \
   --debug
 elif [[ $AKS_HAS_AZURE_MONITOR -eq 1 && $AKS_HAS_AUTO_SCALER -eq 0 && $AKS_HAS_MANAGED_IDENTITY -eq 0 && $AKS_HAS_NETWORK_POLICY -eq 0 ]]; then
@@ -916,6 +932,7 @@ elif [[ $AKS_HAS_AZURE_MONITOR -eq 1 && $AKS_HAS_AUTO_SCALER -eq 0 && $AKS_HAS_M
   --nodepool-name sysnp \
   --nodepool-tags "env=sysnp" \
   --max-pods $AKS_MAX_PODS_PER_NODE \
+  --node-resource-group $AKS_NODE_RESOURCE_GROUP-$PURPOSE \
   --enable-private-cluster \
   --debug
 elif [[ $AKS_HAS_AZURE_MONITOR -eq 0 && $AKS_HAS_AUTO_SCALER -eq 0 && $AKS_HAS_MANAGED_IDENTITY -eq 1 && $AKS_HAS_NETWORK_POLICY -eq 0 ]]; then
@@ -942,6 +959,7 @@ elif [[ $AKS_HAS_AZURE_MONITOR -eq 0 && $AKS_HAS_AUTO_SCALER -eq 0 && $AKS_HAS_M
   --nodepool-name sysnp \
   --nodepool-tags "env=sysnp" \
   --max-pods $AKS_MAX_PODS_PER_NODE \
+  --node-resource-group $AKS_NODE_RESOURCE_GROUP-$PURPOSE \
   --enable-private-cluster \
   --yes \
   --debug
@@ -970,6 +988,7 @@ elif [[ $AKS_HAS_AZURE_MONITOR -eq 0 && $AKS_HAS_AUTO_SCALER -eq 0 && $AKS_HAS_M
   --nodepool-name sysnp \
   --nodepool-tags "env=sysnp" \
   --max-pods $AKS_MAX_PODS_PER_NODE \
+  --node-resource-group $AKS_NODE_RESOURCE_GROUP-$PURPOSE \
   --enable-private-cluster \
   --yes \
   --debug
@@ -999,6 +1018,7 @@ elif [[ $AKS_HAS_AZURE_MONITOR -eq 1 && $AKS_HAS_AUTO_SCALER -eq 0 && $AKS_HAS_M
   --nodepool-name sysnp \
   --nodepool-tags "env=sysnp" \
   --max-pods $AKS_MAX_PODS_PER_NODE \
+  --node-resource-group $AKS_NODE_RESOURCE_GROUP-$PURPOSE \
   --enable-private-cluster \
   --debug
 elif [[ $AKS_HAS_AZURE_MONITOR -eq 0 && $AKS_HAS_AUTO_SCALER -eq 1 && $AKS_HAS_MANAGED_IDENTITY -eq 0 && $AKS_HAS_NETWORK_POLICY -eq 0 ]]; then
@@ -1029,6 +1049,7 @@ elif [[ $AKS_HAS_AZURE_MONITOR -eq 0 && $AKS_HAS_AUTO_SCALER -eq 1 && $AKS_HAS_M
   --nodepool-name sysnp \
   --nodepool-tags "env=sysnp" \
   --max-pods $AKS_MAX_PODS_PER_NODE \
+  --node-resource-group $AKS_NODE_RESOURCE_GROUP-$PURPOSE \
   --enable-private-cluster \
   --yes \
   --debug
@@ -1060,6 +1081,7 @@ elif [[ $AKS_HAS_AZURE_MONITOR -eq 0 && $AKS_HAS_AUTO_SCALER -eq 1 && $AKS_HAS_M
   --nodepool-name sysnp \
   --nodepool-tags "env=sysnp" \
   --max-pods $AKS_MAX_PODS_PER_NODE \
+  --node-resource-group $AKS_NODE_RESOURCE_GROUP-$PURPOSE \
   --enable-private-cluster \
   --yes \
   --debug
@@ -1088,6 +1110,7 @@ else
   --nodepool-name sysnp \
   --nodepool-tags "env=sysnp" \
   --max-pods $AKS_MAX_PODS_PER_NODE \
+  --node-resource-group $AKS_NODE_RESOURCE_GROUP-$PURPOSE \
   --enable-private-cluster \
   --debug
 fi
@@ -1375,7 +1398,9 @@ then
   ssh -i $SSH_PRIV_KEY $GENERIC_ADMIN_USERNAME@$VM_PUBLIC_IP "touch ~/win-pass.txt && echo "$WINDOWS_AKS_ADMIN_PASSWORD" > ~/win-pass.txt"
 
   ## Get Credentials
-  echo "Add Kubectl completion"
+  echo "Get Cluster credentials"
+  ssh -i $SSH_PRIV_KEY $GENERIC_ADMIN_USERNAME@$VM_PUBLIC_IP "az login --use-device"
+  ssh -i $SSH_PRIV_KEY $GENERIC_ADMIN_USERNAME@$VM_PUBLIC_IP "az account set --subscription $SUBID"
   ssh -i $SSH_PRIV_KEY $GENERIC_ADMIN_USERNAME@$VM_PUBLIC_IP "az aks get-credentials --resource-group $AKS_RG_NAME --name $AKS_CLUSTER_NAME"
   
   echo "Public IP of the VM"
@@ -1385,8 +1410,9 @@ fi
 
 }
 
-
 linux_dns () {
+echo "What is the Resource Group name where you want to deploy Linux DNS Server"
+read -e LINUX_RG_NAME
 
 echo "On which Resource Group does your AKS VNET is:"
 read -e AKS_RG_NAME
@@ -1397,94 +1423,127 @@ read -e AKS_CLUSTER_NAME
 echo "What is the VNET Name of your AKS:"
 read -e AKS_VNET_NAME
 
-## VM DNS Server Subnet Creation
-echo "Create VM DNS Server Subnet"
-az network vnet subnet create \
+LINUX_RG_NAME_EXIST=$(az group show -g $LINUX_RG_NAME &>/dev/null; echo $?)
+if [[ $LINUX_RG_NAME_EXIST -ne 0 ]]
+  then
+    echo -e "\n--> Creating the non existent Resource Group ${LINUX_RG_NAME} ...\n"
+    az group create --name $LINUX_RG_NAME --location $LINUX_VM_LOCATION
+  else
+    echo "The Resource Group already exists - Continue"
+fi
+
+## LINUX VM DNS Server Vnet and Subnet Creation
+echo "Create Linux DNS Server Vnet & Subnet"
+az network vnet create \
+  --resource-group $LINUX_RG_NAME \
+  --name $LINUX_DNS_VNET_NAME \
+  --address-prefix $LINUX_DNS_VNET_CIDR \
+  --subnet-name $LINUX_DNS_SUBNET_NAME \
+  --subnet-prefix $LINUX_DNS_SNET_CIDR \
+  --debug
+
+AKS_VNET_ID=$(az network vnet show --resource-group $AKS_RG_NAME --name $AKS_VNET_NAME --query id --output tsv)
+LINUX_VM_VNET_ID=$(az network vnet show --resource-group $LINUX_RG_NAME --name $LINUX_DNS_VNET_NAME --query id --output tsv)
+
+echo "Peering VNet - AKS-LinuxDNS"
+az network vnet peering create \
   --resource-group $AKS_RG_NAME \
+  --name "${AKS_VNET_NAME}-to-${LINUX_DNS_VNET_NAME}" \
   --vnet-name $AKS_VNET_NAME \
-  --name $VM_DNS_SUBNET_NAME \
-  --address-prefixes $VM_DNS_SNET_CIDR \
+  --remote-vnet $LINUX_VM_VNET_ID \
+  --allow-vnet-access \
+  --debug
+
+echo "Peering Vnet - LinuxDNS-AKS"
+az network vnet peering create \
+  --resource-group $LINUX_RG_NAME \
+  --name "${LINUX_DNS_VNET_NAME}-to-${AKS_VNET_NAME}" \
+  --vnet-name $LINUX_DNS_VNET_NAME \
+  --remote-vnet $AKS_VNET_ID \
+  --allow-vnet-access \
   --debug
 
 ## VM NSG Create
 echo "Create NSG"
 az network nsg create \
-  --resource-group $AKS_RG_NAME \
-  --name $DNS_NSG_NAME \
+  --resource-group $LINUX_RG_NAME \
+  --name $LINUX_DNS_NSG_NAME \
   --debug
 
 ## Public IP Create
 echo "Create Public IP"
 az network public-ip create \
-  --name $VM_DNS_PUBLIC_IP_NAME \
-  --resource-group $AKS_RG_NAME \
+  --name $LINUX_DNS_PUBLIC_IP_NAME \
+  --resource-group $LINUX_RG_NAME \
   --debug
 
 ## VM Nic Create
 echo "Create VM Nic"
 az network nic create \
-  --resource-group $AKS_RG_NAME \
-  --vnet-name $AKS_VNET_NAME \
-  --subnet $VM_DNS_SUBNET_NAME \
-  --name $DNS_NIC_NAME \
-  --network-security-group $DNS_NSG_NAME \
+  --resource-group $LINUX_RG_NAME \
+  --vnet-name $LINUX_DNS_VNET_NAME \
+  --subnet $LINUX_DNS_SUBNET_NAME \
+  --name $LINUX_DNS_NIC_NAME \
+  --network-security-group $LINUX_DNS_NSG_NAME \
   --debug 
 
 ## Attach Public IP to VM NIC
 echo "Attach Public IP to VM NIC"
 az network nic ip-config update \
   --name $VM_DNS_DEFAULT_IP_CONFIG \
-  --nic-name $DNS_NIC_NAME \
-  --resource-group $AKS_RG_NAME \
-  --public-ip-address $VM_DNS_PUBLIC_IP_NAME \
+  --nic-name $LINUX_DNS_NIC_NAME \
+  --resource-group $LINUX_RG_NAME \
+  --public-ip-address $LINUX_DNS_PUBLIC_IP_NAME \
   --debug
 
 ## Update NSG in VM Subnet
 echo "Update NSG in VM Subnet"
 az network vnet subnet update \
-  --resource-group $AKS_RG_NAME \
-  --name $VM_DNS_SUBNET_NAME \
-  --vnet-name $AKS_VNET_NAME \
-  --network-security-group $DNS_NSG_NAME \
+  --resource-group $LINUX_RG_NAME \
+  --name $LINUX_DNS_SUBNET_NAME \
+  --vnet-name $LINUX_DNS_VNET_NAME \
+  --network-security-group $LINUX_DNS_NSG_NAME \
   --debug
 
 ## Create VM
 echo "Create VM"
 az vm create \
-  --resource-group $AKS_RG_NAME \
+  --resource-group $LINUX_RG_NAME \
   --authentication-type $LINUX_AUTH_TYPE \
-  --name $DNS_VM_NAME \
-  --computer-name $DNS_INTERNAL_VM_NAME \
+  --name $LINUX_DNS_VM_NAME \
+  --computer-name $LINUX_DNS_INTERNAL_VM_NAME \
   --image $LINUX_VM_IMAGE \
   --size $LINUX_VM_SIZE \
   --admin-username $GENERIC_ADMIN_USERNAME \
   --ssh-key-values $ADMIN_USERNAME_SSH_KEYS_PUB \
   --storage-sku $LINUX_VM_STORAGE_SKU \
   --os-disk-size-gb $LINUX_VM_OS_DISK_SIZE \
-  --os-disk-name $DNS_VM_OS_DISK_NAME \
-  --nics $DNS_NIC_NAME \
-  --tags $DNS_VM_TAGS \
+  --os-disk-name $LINUX_DNS_DISK_NAME \
+  --nics $LINUX_DNS_NIC_NAME \
+  --tags $LINUX_DNS_VM_TAGS \
   --debug
 
-echo "Sleeping 30s - Allow time for Public IP"
-  countdown "00:00:30"
+echo "Sleeping 10s - Allow time for Public IP"
+  countdown "00:00:10"
 
 ## Output Public IP of VM
-echo "Public IP of VM is:"
 DNS_VM_PUBLIC_IP=$(az network public-ip list \
-  --resource-group $AKS_RG_NAME \
-  --output json | jq -r ".[] | select (.name==\"$VM_DNS_PUBLIC_IP_NAME\") | [ .ipAddress] | @tsv")
+  --resource-group $LINUX_RG_NAME \
+  --output json | jq -r ".[] | select (.name==\"$LINUX_DNS_PUBLIC_IP_NAME\") | [ .ipAddress] | @tsv")
+
+echo "Public IP of VM is:"
+echo $DNS_VM_PUBLIC_IP
 
 ## Allow SSH from local ISP
 echo "Update VM NSG to allow SSH"
 az network nsg rule create \
-  --nsg-name $DNS_NSG_NAME \
-  --resource-group $AKS_RG_NAME \
+  --nsg-name $LINUX_DNS_NSG_NAME \
+  --resource-group $LINUX_RG_NAME \
   --name ssh_allow \
   --priority 100 \
   --source-address-prefixes $MY_HOME_PUBLIC_IP \
   --source-port-ranges '*' \
-  --destination-address-prefixes $VM_DNS_PRIV_IP \
+  --destination-address-prefixes $LINUX_VM_DNS_PRIV_IP \
   --destination-port-ranges 22 \
   --access Allow \
   --protocol Tcp \
@@ -1506,11 +1565,6 @@ echo "Goood to go with Input Key Fingerprint"
 ssh-keygen -F $DNS_VM_PUBLIC_IP >/dev/null | ssh-keyscan -H $DNS_VM_PUBLIC_IP >> ~/.ssh/known_hosts
 
 
-BIND_CONFIG_FILE_NAME="named.conf.options"
-ZONE_NAME="emeacontainers.local"
-BIND_DNS_FILE_NAME="$ZONE_NAME.zone"
-ZONE_LOCAL_FILE="named.conf.local"
-
 echo "Write to Bind Config File "
 printf "
 logging {
@@ -1522,7 +1576,7 @@ logging {
           };
   
           channel "query" {
-                    file \"/var/named/bind9/query.log\" versions 4 size 4m;
+                    file \"/var/log/named/query.log\" versions 4 size 4m;
                     print-time YES;
                     print-severity NO;
                     print-category NO;
@@ -1560,14 +1614,12 @@ options {
         auth-nxdomain no;    # conform to RFC1035
         listen-on-v6 { any; };
 };
-" >> $BIND_CONFIG_FILE_NAME
-
-
+" >> $LIN_BIND_CONFIG_FILE_NAME
 
 echo "Write to Bind DNS Zone File "
 printf "
 \$TTL 86400
-@       IN      SOA     aks.$ZONE_NAME. admin.$ZONE_NAME. (
+@       IN      SOA     aks.$LIN_ZONE_NAME. admin.$LIN_ZONE_NAME. (
                         $(date +%Y%m%d)   ; Serial
                         3600              ; Refresh
                         1800              ; Retry
@@ -1575,10 +1627,11 @@ printf "
                         86400             ; Minimum TTL
                 )
 
-@       IN      NS      aks.$ZONE_NAME.
-aks     IN      A       $VM_DNS_PRIV_IP
-emea    IN      CNAME   aks.$ZONE_NAME.
-"  >> $BIND_DNS_FILE_NAME
+@       IN      NS      aks.$LIN_ZONE_NAME.
+aks     IN      A       $LINUX_VM_DNS_PRIV_IP
+@       IN      A       5.6.7.8
+www     IN      CNAME   $LIN_ZONE_NAME.
+"  >> $LIN_BIND_DNS_FILE_NAME
 
 echo "Write to local dns zone file "
 printf "
@@ -1589,11 +1642,11 @@ printf "
 // organization
 //include "/etc/bind/zones.rfc1918";
 
-zone $ZONE_NAME {
+zone \"$LIN_ZONE_NAME\" {
     type master;
-    file $BIND_DNS_FILE_NAME;
+    file \"/etc/bind/$LIN_BIND_DNS_FILE_NAME\";
 };
-"  >> $ZONE_LOCAL_FILE
+"  >> $LIN_ZONE_LOCAL_FILE
 
 ## Update DNS Server VM
 echo "Update DNS Server VM and Install Bind9"
@@ -1610,39 +1663,39 @@ ssh -i $SSH_PRIV_KEY $GENERIC_ADMIN_USERNAME@$DNS_VM_PUBLIC_IP "sudo cp /etc/bin
 
 ## Create Bind9 Logs folder
 echo "Create Bind9 Logs folder"
-ssh -i $SSH_PRIV_KEY $GENERIC_ADMIN_USERNAME@$DNS_VM_PUBLIC_IP "sudo mkdir -p /var/named/bind9"
+ssh -i $SSH_PRIV_KEY $GENERIC_ADMIN_USERNAME@$DNS_VM_PUBLIC_IP "sudo mkdir /var/log/named"
 
 ## Setup good permission in Bind9 Logs folder - change owner
 echo "Setup good permission in Bind9 Logs folder - change owner"
-ssh -i $SSH_PRIV_KEY $GENERIC_ADMIN_USERNAME@$DNS_VM_PUBLIC_IP "sudo chown -R bind:bind /var/named/bind9"
+ssh -i $SSH_PRIV_KEY $GENERIC_ADMIN_USERNAME@$DNS_VM_PUBLIC_IP "sudo chown -R bind:bind /var/log/named"
 
 ## Setup good permission in Bind9 Logs folder - change permissions
 echo "Setup good permission in Bind9 Logs folder - change permissions"
-ssh -i $SSH_PRIV_KEY $GENERIC_ADMIN_USERNAME@$DNS_VM_PUBLIC_IP "sudo chmod -R 775 /var/named/bind9"
+ssh -i $SSH_PRIV_KEY $GENERIC_ADMIN_USERNAME@$DNS_VM_PUBLIC_IP "sudo chmod -R 775 /var/log/named"
 
 ## Copy Bind Config file to DNS Server
 echo "Copy Bind Config File to Remote DNS server"
-scp -i $SSH_PRIV_KEY $BIND_CONFIG_FILE_NAME $GENERIC_ADMIN_USERNAME@$DNS_VM_PUBLIC_IP:/tmp
+scp -i $SSH_PRIV_KEY $LIN_BIND_CONFIG_FILE_NAME $GENERIC_ADMIN_USERNAME@$DNS_VM_PUBLIC_IP:/tmp
 
 ## sudo cp options file to /etc/bind/
 echo "Copy the Bind File to /etc/bind"
-ssh -i $SSH_PRIV_KEY $GENERIC_ADMIN_USERNAME@$DNS_VM_PUBLIC_IP "sudo cp /tmp/$BIND_CONFIG_FILE_NAME /etc/bind"
+ssh -i $SSH_PRIV_KEY $GENERIC_ADMIN_USERNAME@$DNS_VM_PUBLIC_IP "sudo cp /tmp/$LIN_BIND_CONFIG_FILE_NAME /etc/bind"
 
 ## Copy Bind DNS file to DNS Server
 echo "Copy Bind DNS File to Remote DNS server"
-scp -i $SSH_PRIV_KEY $BIND_DNS_FILE_NAME $GENERIC_ADMIN_USERNAME@$DNS_VM_PUBLIC_IP:/tmp
+scp -i $SSH_PRIV_KEY $LIN_BIND_DNS_FILE_NAME $GENERIC_ADMIN_USERNAME@$DNS_VM_PUBLIC_IP:/tmp
 
 ## sudo cp options file to /etc/bind/
 echo "Copy the Bind File to /etc/bind"
-ssh -i $SSH_PRIV_KEY $GENERIC_ADMIN_USERNAME@$DNS_VM_PUBLIC_IP "sudo cp /tmp/$BIND_DNS_FILE_NAME /etc/bind"
+ssh -i $SSH_PRIV_KEY $GENERIC_ADMIN_USERNAME@$DNS_VM_PUBLIC_IP "sudo cp /tmp/$LIN_BIND_DNS_FILE_NAME /etc/bind"
 
 ## Copy Bind Config file to DNS Server
 echo "Copy Bind Config File to Remote DNS server"
-scp -i $SSH_PRIV_KEY $ZONE_LOCAL_FILE $GENERIC_ADMIN_USERNAME@$DNS_VM_PUBLIC_IP:/tmp
+scp -i $SSH_PRIV_KEY $LIN_ZONE_LOCAL_FILE $GENERIC_ADMIN_USERNAME@$DNS_VM_PUBLIC_IP:/tmp
 
 ## sudo cp options file to /etc/bind/
 echo "Copy the Bind File to /etc/bind"
-ssh -i $SSH_PRIV_KEY $GENERIC_ADMIN_USERNAME@$DNS_VM_PUBLIC_IP "sudo cp /tmp/$ZONE_LOCAL_FILE /etc/bind"
+ssh -i $SSH_PRIV_KEY $GENERIC_ADMIN_USERNAME@$DNS_VM_PUBLIC_IP "sudo cp /tmp/$LIN_ZONE_LOCAL_FILE /etc/bind"
 
 ## sudo systemctl stop bind9
 echo "Stop Bind9"
@@ -1667,22 +1720,21 @@ metadata:
   namespace: kube-system
 data:
   byodnsio.server: | 
-    $ZONE_NAME:53 {
+    $LIN_ZONE_NAME:53 {
         log 
         errors
         cache 15
-        forward . $VM_DNS_PRIV_IP
-    }   
-" >> $CORE_DNS_CONFIGMAP
+        forward . $LINUX_VM_DNS_PRIV_IP
+    }   " >> $CORE_DNS_CONFIGMAP
 
 echo "Cleaning up Bind Config File"
-rm -rf $BIND_CONFIG_FILE_NAME
+rm -rf $LIN_BIND_CONFIG_FILE_NAME
 
 echo "Cleaning up Bind dns zone File"
-rm -rf $BIND_DNS_FILE_NAME
+rm -rf $LIN_BIND_DNS_FILE_NAME
 
 echo "Cleaning up Bind dns zone File"
-rm -rf $ZONE_LOCAL_FILE
+rm -rf $LIN_ZONE_LOCAL_FILE
 
 ## Get Credentials
 echo "Getting Cluster Credentials"
@@ -1694,6 +1746,9 @@ kubectl apply -f $CORE_DNS_CONFIGMAP
 ## Re-deploy CoreDNS pods 
 echo "Re-deploy CoreDNS pods"
 kubectl rollout restart -n kube-system deployment/coredns
+
+echo "Cleaning up Bind Config File"
+rm -rf $CORE_DNS_CONFIGMAP
 
 }
 
@@ -1722,7 +1777,7 @@ read -e SUBNET_NSG_NAME
  ## Public IP Create
 echo "Create Public IP"
 az network public-ip create \
-  --name $LINUX_VM_PUBLIC_IP_NAME \
+  --name $LINUX_SUBNET_VM_PUBLIC_IP_NAME \
   --resource-group $LINUX_RG_NAME \
   --debug
 ## VM Nic Create
@@ -1731,7 +1786,7 @@ az network nic create \
   --resource-group $LINUX_RG_NAME \
   --vnet-name $LINUX_VM_VNET_NAME \
   --subnet $LINUX_VM_SUBNET_NAME \
-  --name $LINUX_VM_NIC_NAME \
+  --name $LINUX_VM_SUBNET_NIC_NAME \
   --network-security-group $SUBNET_NSG_NAME \
   --debug
 
@@ -1739,9 +1794,9 @@ az network nic create \
 echo "Attach Public IP to VM NIC"
 az network nic ip-config update \
   --name $LINUX_VM_DEFAULT_IP_CONFIG \
-  --nic-name $LINUX_VM_NIC_NAME \
+  --nic-name $LINUX_VM_SUBNET_NIC_NAME \
   --resource-group $LINUX_RG_NAME \
-  --public-ip-address $LINUX_VM_PUBLIC_IP_NAME \
+  --public-ip-address $LINUX_SUBNET_VM_PUBLIC_IP_NAME \
   --debug
 
 ## Create VM
@@ -1749,7 +1804,7 @@ echo "Creating Virtual Machine...."
 az vm create \
   --resource-group $LINUX_RG_NAME \
   --authentication-type $LINUX_AUTH_TYPE \
-  --name $LINUX_VM_NAME \
+  --name $LINUX_VM_NAME_SUBNET \
   --computer-name $LINUX_VM_INTERNAL_NAME \
   --image $LINUX_VM_IMAGE \
   --size $LINUX_VM_SIZE \
@@ -1757,8 +1812,8 @@ az vm create \
   --ssh-key-values $ADMIN_USERNAME_SSH_KEYS_PUB \
   --storage-sku $LINUX_VM_STORAGE_SKU \
   --os-disk-size-gb $LINUX_VM_OS_DISK_SIZE \
-  --os-disk-name $LINUX_VM_OS_DISK_NAME \
-  --nics $LINUX_VM_NIC_NAME \
+  --os-disk-name $LINUX_DISK_NAME_SUBNET \
+  --nics $LINUX_VM_SUBNET_NIC_NAME \
   --tags $LINUX_TAGS \
   --debug 
 
@@ -1769,13 +1824,13 @@ az vm create \
   echo "Getting Public IP of VM"
   LINUX_VM_PUBLIC_IP=$(az network public-ip list \
     --resource-group $LINUX_RG_NAME \
-    --output json | jq -r ".[] | select ( .name == \"$LINUX_VM_PUBLIC_IP_NAME\" ) | [ .ipAddress ] | @tsv")
+    --output json | jq -r ".[] | select ( .name == \"$LINUX_SUBNET_VM_PUBLIC_IP_NAME\" ) | [ .ipAddress ] | @tsv")
   echo "Public IP of VM is:"
   echo $LINUX_VM_PUBLIC_IP
 
   ## Get Priv IP of Linux JS VM
   echo "Getting Linux VM Priv IP"
-  LINUX_PRIV_IP=$(az vm list-ip-addresses --resource-group $LINUX_RG_NAME --name $LINUX_VM_NAME --output json | jq -r ".[] | [ .virtualMachine.network.privateIpAddresses[0] ] | @tsv")
+  LINUX_PRIV_IP=$(az vm list-ip-addresses --resource-group $LINUX_RG_NAME --name $LINUX_VM_NAME_SUBNET --output json | jq -r ".[] | [ .virtualMachine.network.privateIpAddresses[0] ] | @tsv")
 
   ## Allow SSH from my Home
   echo "Update Subnet NSG to allow SSH"
@@ -1809,8 +1864,20 @@ az vm create \
   ssh-keygen -F $LINUX_VM_PUBLIC_IP >/dev/null | ssh-keyscan -H $LINUX_VM_PUBLIC_IP >> ~/.ssh/known_hosts
 
   ## Install and update software
-  echo "Updating VM and Stuff"
+  echo "Updating VM and installing required software"
   ssh -i $LINUX_SSH_PRIV_KEY $GENERIC_ADMIN_USERNAME@$LINUX_VM_PUBLIC_IP "sudo apt update && sudo apt upgrade -y"
+
+  echo "Installing ca-certificates curl gnupg:"
+  ssh -i $LINUX_SSH_PRIV_KEY $GENERIC_ADMIN_USERNAME@$LINUX_VM_PUBLIC_IP "sudo apt-get install ca-certificates curl gnupg -y"
+  echo "Adding Docker's official GPG key:"
+  ssh -i $LINUX_SSH_PRIV_KEY $GENERIC_ADMIN_USERNAME@$LINUX_VM_PUBLIC_IP "sudo mkdir -m 0755 -p /etc/apt/keyrings; curl -fsSL https://download.docker.com/linux/ubuntu/gpg | sudo gpg --dearmor -o /etc/apt/keyrings/docker.gpg"
+  echo "Setup docker's repository"
+  ssh -i $LINUX_SSH_PRIV_KEY $GENERIC_ADMIN_USERNAME@$LINUX_VM_PUBLIC_IP "echo "deb [arch="$(dpkg --print-architecture)" signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/ubuntu "$(. /etc/os-release && echo "$VERSION_CODENAME")" stable" | sudo tee /etc/apt/sources.list.d/docker.list > /dev/null"
+  
+    ## VM Install software
+  echo "Installing Docker Software..."
+  ssh -i $LINUX_SSH_PRIV_KEY $GENERIC_ADMIN_USERNAME@$LINUX_VM_PUBLIC_IP "sudo apt-get update -y"
+  ssh -i $LINUX_SSH_PRIV_KEY $GENERIC_ADMIN_USERNAME@$LINUX_VM_PUBLIC_IP "sudo apt install docker-ce docker-ce-cli containerd.io -y"
 
   ## VM Install software
   echo "VM Install software"
@@ -1843,26 +1910,13 @@ az vm create \
 }
 
 function windows_dns(){
-
-echo "What is the Resource Group name where you want to deploy Windows DNS Server"
-read -e WINDOWS_RG_NAME
-
-echo "On which Resource Group does your AKS VNET is:"
-read -e AKS_RG_NAME
-
-echo "What is the Cluster Name:"
-read -e AKS_CLUSTER_NAME
-
-echo "What is the VNET Name of your AKS:"
-read -e AKS_VNET_NAME
-
 WINDOWS_RG_NAME_EXIST=$(az group show -g $WINDOWS_RG_NAME &>/dev/null; echo $?)
 if [[ $WINDOWS_RG_NAME_EXIST -ne 0 ]]
-   then
-    echo -e "\n--> Creating the non existent Resource Group ${LINUX_RG_NAME} ...\n"
+  then
+    echo -e "\n--> Creating the non existent Resource Group ${WINDOWS_RG_NAME} ...\n"
     az group create --name $WINDOWS_RG_NAME --location $WINDOWS_DNS_LOCATION
-else
-    echo "The Resource Group already exists"
+  else
+    echo "The Resource Group already exists - Continue"
 fi
 
 ## WINDOWS VM DNS Server Vnet and Subnet Creation
@@ -1943,27 +1997,28 @@ az network vnet subnet update \
 
 ## Windows Create VM
 echo "Create Windows VM"
+echo $WIN_VM_IMAGE
 az vm create \
   --resource-group $WINDOWS_RG_NAME \
-  --name $WIN_VM_NAME \
-  --image $WIN_VM_IMAGE  \
+  --name $WINDOWS_VM_NAME \
+  --image "MicrosoftWindowsServer:WindowsServer:2019-Datacenter:latest"  \
   --admin-username $GENERIC_ADMIN_USERNAME \
   --admin-password $WINDOWS_ADMIN_PASSWORD \
-  --nics $WIN_VM_NIC_NAME \
-  --tags $WIN_VM_TAGS \
-  --computer-name $WIN_VM_INTERNAL_NAME \
+  --nics $WINDOWS_DNS_NIC_NAME \
+  --tags $WINDOWS_VM_TAGS \
+  --computer-name $WINDOWS_VM_INTERNAL_NAME \
   --authentication-type password \
-  --size $WIN_VM_SIZE \
-  --storage-sku $WIN_VM_STORAGE_SKU \
-  --os-disk-size-gb $WIN_VM_OS_DISK_SIZE \
-  --os-disk-name $WIN_VM_OS_DISK_NAME \
+  --size $WINDOWS_VM_SIZE \
+  --storage-sku $WINDOWS_VM_STORAGE_SKU \
+  --os-disk-size-gb $WINDOWS_VM_OS_DISK_SIZE \
+  --os-disk-name $WINDOWS_VM_OS_DISK_NAME \
   --nsg-rule NONE \
   --debug
 
 echo "Sleeping 30s - Allow time for Windows VM Creation"
 countdown "00:00:30"
 ## Output Public IP of VM
-WIN_VM_PUBLIC_IP=$(az network public-ip list --resource-group $WINDOWS_RG_NAME -o json | jq -r ".[] | [.name, .ipAddress] | @csv" | grep rdc | awk -F "," '{print $2}')
+WIN_VM_PUBLIC_IP=$(az network public-ip list --resource-group $WINDOWS_RG_NAME -o json | jq -r ".[] | [.name, .ipAddress] | @csv" | grep $WINDOWS_DNS_PUBLIC_IP_NAME | awk -F "," '{print $2}')
 WIN_VM_PUBLIC_IP_PARSED=$(echo $WIN_VM_PUBLIC_IP | sed 's/"//g')
 
 echo "Public IP of VM is:"
@@ -1984,22 +2039,43 @@ az network nsg rule create \
   --protocol Tcp \
   --description "Allow from MY ISP IP"
 
-az vm run-command invoke --resource-group $WINDOWS_RG_NAME --name $WIN_VM_NAME \
+az vm run-command invoke --resource-group $WINDOWS_RG_NAME --name $WINDOWS_VM_NAME \
    --command-id RunPowerShellScript \
    --scripts "Install-WindowsFeature -name DNS -IncludeManagementTools -IncludeAllSubFeature"
    
-az vm run-command invoke --resource-group $WINDOWS_RG_NAME --name $WIN_VM_NAME \
+az vm run-command invoke --resource-group $WINDOWS_RG_NAME --name $WINDOWS_VM_NAME \
    --command-id RunPowerShellScript \
-   --scripts "Add-DnsServerPrimaryZone -Name 'containers.emea.bb' -ZoneFile 'containers.emea.bb.dns'"
+   --scripts "Add-DnsServerPrimaryZone -Name '$WIN_ZONE' -ZoneFile '$WIN_ZONE.dns'"
    
-az vm run-command invoke --resource-group $WINDOWS_RG_NAME --name $WIN_VM_NAME \
+az vm run-command invoke --resource-group $WINDOWS_RG_NAME --name $WINDOWS_VM_NAME \
    --command-id RunPowerShellScript \
-   --scripts "Add-DnsServerResourceRecordA -Name '@' -Ipv4address 1.2.3.4 -ZoneName 'containers.emea.bb' ; Add-DnsServerResourceRecordCName -Name 'www' -HostNameAlias 'containers.emea.bb' -ZoneName 'containers.emea.bb'"
+   --scripts "Add-DnsServerResourceRecordA -Name '@' -Ipv4address '$WIN_A_RECORD_IP' -ZoneName '$WIN_ZONE' ; Add-DnsServerResourceRecordCName -Name 'www' -HostNameAlias '$WIN_ZONE' -ZoneName '$WIN_ZONE'"
    
-### Change DNs server for AKS VNET
+### Change DNS server for AKS VNET
+echo "Changing $AKS_VNET_NAME DNS configuration"
 az network vnet update --resource-group $AKS_RG_NAME --name $AKS_VNET_NAME --dns-servers $WINDOWS_VM_PRIV_IP
 
+
+echo "Sleeping 10s - Allow time for DNS Servers to be changed at VNET Level"
+countdown "00:00:10"
+
+
+printf "|`tput bold` %-40s `tput sgr0`|\n" "After changing the DNS server at VNET level you will need to perform a DHCP_Release on the nodes so trigger the script again and choose option 8"
 }
+
+function dhcp_release() {
+### Perform a DHCP release on the cluster nodes
+NODE_RESOURCE_GROUP=$(az aks show --resource-group $AKS_RG_NAME --name $AKS_CLUSTER_NAME --query nodeResourceGroup --output tsv)
+NODE_INSTANCES_NAME=($(az vmss list --resource-group $NODE_RESOURCE_GROUP --query [].name --output tsv))
+
+for vmssName in "${NODE_INSTANCES_NAME[@]}"
+do
+    #  Perform DHCP release for each of the vmss instance
+    echo "Performing DHCP release for each $vmssName instance"
+    az vmss list-instances --resource-group  $NODE_RESOURCE_GROUP --name $vmssName --query "[].id" --output tsv | az vmss run-command invoke --scripts "{ dhclient -x; dhclient -i eth0; sleep 10; pkill dhclient; grep nameserver /etc/resolv.conf; }" --command-id RunShellScript --ids @-
+done
+}
+
 function list_aks() {
 function printTable(){
     local -r delimiter="${1}"
@@ -2122,6 +2198,57 @@ printTable ',' $AKS_STATUS_LIST
 
 }
 
+function helm_nginx_internal(){
+
+echo -e "\n--> Warning: You must target a public faced cluster or run the script from the Jump Server in case its private\n"
+echo -e "\n--> ......Installing Helm.....\n"
+curl https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3 | bash
+echo "What is the Resource Group of your Cluster:"
+read -e AKS_RG_NAME
+echo "What is the Cluster Name:"
+read -e AKS_CLUSTER_NAME
+
+## Get Credentials
+echo "Getting Cluster Credentials"
+az aks get-credentials --resource-group $AKS_RG_NAME --name $AKS_CLUSTER_NAME --overwrite-existing
+
+## Add the ingress-nginx repository
+echo "Add Ingress Controller Helm Repo"
+helm repo add ingress-nginx https://kubernetes.github.io/ingress-nginx
+
+## Install 
+echo "Install Nginx Ingress"
+helm install nginx-ingress ingress-nginx/ingress-nginx \
+    --namespace ingress-basic --create-namespace \
+    --set controller.replicaCount=2 \
+    --set controller.nodeSelector."kubernetes\.io/os"=linux \
+    --set controller.image.digest="" \
+    --set controller.admissionWebhooks.patch.nodeSelector."kubernetes\.io/os"=linux \
+    --set controller.admissionWebhooks.patch.image.digest="" \
+    --set defaultBackend.nodeSelector."kubernetes\.io/os"=linux \
+    --set defaultBackend.image.digest="" \
+    --set controller.service.annotations."service\.beta\.kubernetes\.io/azure-load-balancer-internal"=true \
+    --set controller.service.annotations."service\.beta\.kubernetes\.io/azure-load-balancer-health-probe-request-path"=/healthz
+
+
+## Get PIP of LB
+echo "Get PIP of LB"
+LB_PIP=$(kubectl get svc -A -n nginx-ingress-ingress-nginx-controller --no-headers -o json | jq -r '.items[].status.loadBalancer.ingress[]?.ip' | wc -l)
+
+while [[ "$LB_PIP" = "0" ]]
+do
+    echo "not good to go: $LB_PIP"
+    echo "Sleeping for 5s..."
+    sleep 5
+    LB_PIP=$(kubectl get svc -A -n nginx-ingress-ingress-nginx-controller --no-headers -o json | jq -r '.items[].status.loadBalancer.ingress[]?.ip' | wc -l)
+done
+
+echo "Go to go with LB PIP"
+LB_PIP=$(kubectl get svc -A -n nginx-ingress-ingress-nginx-controller --no-headers -o json | jq -r '.items[].status.loadBalancer.ingress[]?.ip')
+echo "LB PIP is: $LB_PIP"
+}
+
+
 function helm_nginx (){
 
 echo -e "\n--> Warning: You must target a public faced cluster or run the script from the Jump Server in case its private\n"
@@ -2137,7 +2264,7 @@ echo "Getting Cluster Credentials"
 az aks get-credentials --resource-group $AKS_RG_NAME --name $AKS_CLUSTER_NAME --overwrite-existing
 
 ## Add the ingress-nginx repository
-echo "Add IngController Helm Repo"
+echo "Add Ingress Controller Helm Repo"
 helm repo add ingress-nginx https://kubernetes.github.io/ingress-nginx
 
 ## Install 
@@ -2182,7 +2309,99 @@ kubectl apply -f app-ingress.yaml --namespace ingress-basic
 
 }
 
-options=("Azure Cluster" "Kubenet Cluster" "Private Cluster" "List existing AKS Clusters" "Create Linux VM on Subnet" "Linux DNS VM" "Windows DNS VM" "Helm Nginx Ingress Controller" "Destroy Environment" "Quit")
+
+function agic_brownfield (){
+
+echo -e "\n--> Warning: You must target a public faced cluster or run the script from the Jump Server in case its private\n"  
+echo -e "\n--> Brownfield assumes that you have already an existing AKS cluster\n"
+echo "What is the Resource Group of your Cluster:"
+read -e AKS_RG_NAME
+echo "What is the Cluster Name:"
+read -e AKS_CLUSTER_NAME
+echo "What is the Resource Group where you want to deploy your App Gateway?"
+read -e APPGTW_RG_NAME
+
+echo "Creating the Resource Group for APP Gateway Resource..."
+az group create \
+  --name $APPGTW_RG_NAME \
+  --location $AKS_RG_LOCATION \
+  --tags env=agic \
+  --debug
+
+echo "Creating the Public IP Address for the App Gateway..."
+az network public-ip create \
+  --name $APPGTW_PIP_NAME \
+  --resource-group $APPGTW_RG_NAME \
+  --allocation-method Static \
+  --sku Standard
+
+echo "Sleeping 30s - Allow time for Public IP"
+countdown "00:00:30"
+
+echo "Creating the VNET and Subnet for App Gateway..."
+az network vnet create \
+  --name $APPGTW_VNET_NAME \
+  --resource-group $APPGTW_RG_NAME \
+  --address-prefix $APPGTW_VNET_CIDR \
+  --subnet-name $APPGTW_SNET_NAME \
+  --subnet-prefix $APPGTW_SNET_CIDR
+
+echo "Creating the App Gateway Resource..."
+az network application-gateway create \
+  --name $APPGTW_NAME \
+  --resource-group $APPGTW_RG_NAME \
+  --sku Standard_v2 \
+  --public-ip-address $APPGTW_PIP_NAME \
+  --vnet-name $APPGTW_VNET_NAME \
+  --subnet $APPGTW_SNET_NAME \
+  --priority 100 \
+  --debug \
+  --verbose
+
+echo "Sleeping 30secs - Allow time for App Gateway to be created"
+countdown "00:00:30"
+
+
+APP_GTW_ID=$(az network application-gateway show --name $APPGTW_NAME --resource-group $APPGTW_RG_NAME -o tsv --query "id")
+
+echo "App Gateway is created on $APP_GTW_ID"
+
+echo "Enabling AGIC addon on the AKS cluster..."
+
+az aks enable-addons --name $AKS_CLUSTER_NAME --resource-group $AKS_RG_NAME -a ingress-appgw --appgw-id $APP_GTW_ID
+
+echo "Sleeping 30s - Allow time for addon to be enabled IP"
+countdown "00:00:30"
+
+echo "Peer the two VNETs together..."
+
+
+AKS_VNET=$(az network vnet list --resource-group $AKS_RG_NAME -o tsv --query "[0].name")
+
+AKS_VNET_ID=$(az network vnet show --name $AKS_VNET --resource-group $AKS_RG_NAME -o tsv --query "id")
+
+az network vnet peering create \
+  --name AppGWtoAKSVnetPeering \
+  --resource-group $APPGTW_RG_NAME \
+  --vnet-name $APPGTW_VNET_NAME \
+  --remote-vnet $AKS_VNET_ID \
+  --allow-vnet-access
+
+APP_GTW_VNET_ID=$(az network vnet show --name $APPGTW_VNET_NAME --resource-group $APPGTW_RG_NAME -o tsv --query "id")
+
+az network vnet peering create \
+  --name AKStoAppGWVnetPeering \
+  --resource-group $AKS_RG_NAME \
+  --vnet-name $AKS_VNET \
+  --remote-vnet $APP_GTW_VNET_ID \
+  --allow-vnet-access
+
+
+printf "|`tput bold` %-40s `tput sgr0`|\n" "In case you have an existing AKS cluster using Kubenet mode you need to update the route table to help the packets destined for a POD IP reach the node which is hosting the pod. A simple way to achieve this is by associating the same route table created by AKS to the Application Gateway's subnet."
+
+}
+
+options=("Azure Cluster" "Kubenet Cluster" "Private Cluster" "List existing AKS Clusters" "Create Linux VM on Subnet" "Linux DNS VM" "Windows DNS VM" "DHCP Release" "Helm Nginx Ingress Controller" "Helm Nginx Ingress Controller-Internal" "AGIC-Brownfield" "Destroy Environment" "Quit")
 select opt in "${options[@]}"
 do    
 	case $opt in
@@ -2223,11 +2442,35 @@ do
         break;;
       "Windows DNS VM")
         az_login_check
+        echo "What is the Resource Group name where you want to deploy Windows DNS Server"
+        read -e WINDOWS_RG_NAME
+        echo "On which Resource Group does your AKS VNET is:"
+        read -e AKS_RG_NAME
+        echo "What is the Cluster Name:"
+        read -e AKS_CLUSTER_NAME
+        echo "What is the VNET Name of your AKS:"
+        read -e AKS_VNET_NAME
         windows_dns
+        break;;
+      "DHCP Release")
+        az_login_check
+        echo "What is the Resource Group of your AKS:"
+        read -e AKS_RG_NAME
+        echo "What is the Cluster Name:"
+        read -e AKS_CLUSTER_NAME
+        dhcp_release
         break;;
 	    "Helm Nginx Ingress Controller")
         az_login_check
         helm_nginx
+        break;;
+	    "Helm Nginx Ingress Controller-Internal")
+        az_login_check
+        helm_nginx_internal
+        break;;
+	    "AGIC-Brownfield")
+        az_login_check
+        agic_brownfield
         break;;
 	    "Destroy Environment")
         az_login_check
