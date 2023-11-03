@@ -2243,7 +2243,7 @@ do
     LB_PIP=$(kubectl get svc -A -n nginx-ingress-ingress-nginx-controller --no-headers -o json | jq -r '.items[].status.loadBalancer.ingress[]?.ip' | wc -l)
 done
 
-echo "Go to go with LB PIP"
+echo "This is the Internal LB IP"
 LB_PIP=$(kubectl get svc -A -n nginx-ingress-ingress-nginx-controller --no-headers -o json | jq -r '.items[].status.loadBalancer.ingress[]?.ip')
 echo "LB PIP is: $LB_PIP"
 }
