@@ -1,7 +1,7 @@
 ## GENERAL VARIABLES
 PURPOSE="default"
 AKS_RG_LOCATION="westeurope"
-AKS_VERSION="1.24.9"
+AKS_VERSION="1.28.5"
 AKS_VNET_2_OCTETS="10.4"   # Define the fisrt 2 octets for Vnet
 LINUX_VNET_2_OCTETS="10.5" # Define the fisrt 2 octets for Linux Vnet
 WINDOWS_VNET_2_OCTETS="10.6" # Define the fisrt 2 octets for Windows Vnet
@@ -30,9 +30,9 @@ APPGTW_NAME="appgtw"
 AKS_HAS_AZURE_MONITOR="0"     # 1 = AKS has Az Mon enabled
 AKS_HAS_AUTO_SCALER="0"       # 1 = AKS has Auto Scaler enabled
 AKS_HAS_MANAGED_IDENTITY="1"  # 1 = AKS has Managed Identity enabled
-AKS_HAS_NETWORK_POLICY="0"    # 1 = AKS has Azure Net Pol enabled
+AKS_HAS_NETWORK_POLICY="1"    # 1 = AKS has Azure Net Pol enabled
 AKS_HAS_2ND_NODEPOOL="1"      # 1 = AKS has second npool
-AKS_CREATE_JUMP_SERVER="1"    # 1 = If we need to create a JS from Other Vnet 
+AKS_CREATE_JUMP_SERVER="0"    # 1 = If we need to create a JS from Other Vnet 
 AKS_HAS_JUMP_SERVER="0"       # 1 = If we already have a Jump Server from Other Vnet, with Peered Vnet 
 
 #########################################################################
@@ -63,7 +63,8 @@ OS_SKU="Ubuntu"   # CBLMariner, Ubuntu, Windows2019, Windows2022
 AKS_CNI_PLUGIN="azure"
 AKS_VNET="vnet-"$AKS_CLUSTER_NAME
 AKS_SNET="snet-"$AKS_CLUSTER_NAME
-AKS_NET_NPOLICY="azure"   # calico or azure
+AKS_NET_NPOLICY="calico"   # calico or azure
+#AKS_NET_NPOLICY="azure"   # calico or azure
 
 ## My ISP PIP
 MY_HOME_PUBLIC_IP=$(curl -s -4 ifconfig.io)
