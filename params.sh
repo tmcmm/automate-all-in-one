@@ -1,7 +1,7 @@
 ## GENERAL VARIABLES
 PURPOSE="default"
-AKS_RG_LOCATION="westeurope"
-AKS_VERSION="1.28.5"
+AKS_RG_LOCATION="northeurope"
+AKS_VERSION="1.33.0"
 AKS_VNET_2_OCTETS="10.4"   # Define the fisrt 2 octets for Vnet
 LINUX_VNET_2_OCTETS="10.5" # Define the fisrt 2 octets for Linux Vnet
 WINDOWS_VNET_2_OCTETS="10.6" # Define the fisrt 2 octets for Windows Vnet
@@ -14,7 +14,7 @@ AKS_VNET_CIDR="$AKS_VNET_2_OCTETS.0.0/16"
 AKS_SNET_CIDR="$AKS_VNET_2_OCTETS.0.0/23"
 AKS_CLUSTER_SRV_CIDR="$AKS_VNET_2_OCTETS.2.0/24"
 AKS_CLUSTER_DNS="$AKS_VNET_2_OCTETS.2.10"
-AKS_CLUSTER_DOCKER_BRIDGE="172.17.0.1/16"
+AKS_POD_CIDR="192.168.0.0/16"
 
 ## APP Gateway Vnet Settings
 APPGTW_VNET_CIDR="$APPGTW_VNET_2_OCTETS.0.0/16"
@@ -30,7 +30,7 @@ APPGTW_NAME="appgtw"
 AKS_HAS_AZURE_MONITOR="0"     # 1 = AKS has Az Mon enabled
 AKS_HAS_AUTO_SCALER="0"       # 1 = AKS has Auto Scaler enabled
 AKS_HAS_MANAGED_IDENTITY="1"  # 1 = AKS has Managed Identity enabled
-AKS_HAS_NETWORK_POLICY="1"    # 1 = AKS has Azure Net Pol enabled
+AKS_HAS_NETWORK_POLICY="0"    # 1 = AKS has Azure Net Pol enabled
 AKS_HAS_2ND_NODEPOOL="1"      # 1 = AKS has second npool
 AKS_CREATE_JUMP_SERVER="0"    # 1 = If we need to create a JS from Other Vnet 
 AKS_HAS_JUMP_SERVER="0"       # 1 = If we already have a Jump Server from Other Vnet, with Peered Vnet 
@@ -43,7 +43,7 @@ EXISTING_JUMP_SERVER_VNET_NAME="vnet-vm-jpsrv"
 ## AKS Specifics
 AKS_RG_NAME="rg-aks"
 AKS_CLUSTER_NAME="aks"
-AKS_NODE_RESOURCE_GROUP="MC_NODERG-"$AKS_CLUSTER_NAME-$AKS_RG_LOCATION
+AKS_NODE_RESOURCE_GROUP="MC_NODERG-"
 AKS_SYS_NP_NODE_SIZE="Standard_D4s_v3"
 AKS_USR_NP_NODE_SIZE="Standard_D4s_v3"
 AKS_SYS_NP_NODE_COUNT="1"
@@ -64,7 +64,6 @@ AKS_CNI_PLUGIN="azure"
 AKS_VNET="vnet-"$AKS_CLUSTER_NAME
 AKS_SNET="snet-"$AKS_CLUSTER_NAME
 AKS_NET_NPOLICY="calico"   # calico or azure
-#AKS_NET_NPOLICY="azure"   # calico or azure
 
 ## My ISP PIP
 MY_HOME_PUBLIC_IP=$(curl -s -4 ifconfig.io)
@@ -114,7 +113,7 @@ LINUX_TAGS="env=kubernetes"
 
 
 ## Windows DNS Parameters
-WINDOWS_DNS_LOCATION="westeurope"
+WINDOWS_DNS_LOCATION="northeurope"
 WINDOWS_VM_VNET_NAME="windows-vnet-dns"
 WINDOWS_VM_VNET_CIDR="$WINDOWS_VNET_2_OCTETS.6.0/24"
 WINDOWS_VM_SUBNET_NAME="windows-subnet-dns"
@@ -136,7 +135,7 @@ WINDOWS_VM_SIZE="Standard_D4s_v3"
 WINDOWS_VM_STORAGE_SKU="Standard_LRS"
 WINDOWS_VM_OS_DISK_SIZE="130"
 WINDOWS_VM_TAGS="dns=brownbag"
-WIN_ZONE="emeabrownbag-win.containers"
+WIN_ZONE="localdns-emea-act-session.containers"
 WIN_A_RECORD_IP="10.4.0.47"
 
 

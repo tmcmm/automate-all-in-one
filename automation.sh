@@ -9,7 +9,9 @@ banner(){
   echo "|                                          |"
   printf "|`tput bold` %-40s `tput sgr0`|\n" "$@"
   echo "+------------------------------------------+"
+  printf "\n"
 }
+
 banner "Azure Containers Chat Team - EMEA"
 printf "|`tput bold` %-40s `tput sgr0`|\n" "Pre-requisites:"
 printf "|`tput bold` %-40s `tput sgr0`|\n" "Install JQuery/JQ"
@@ -19,6 +21,8 @@ printf "|`tput bold` %-40s `tput sgr0`|\n" "ssh-keygen -o -t rsa -b 4096 -C emai
 printf "|`tput bold` %-40s `tput sgr0`|\n" "export ADMIN_USERNAME_SSH_KEYS_PUB"
 printf "|`tput bold` %-40s `tput sgr0`|\n" "export WINDOWS_ADMIN_PASSWORD"
 printf "|`tput bold` %-40s `tput sgr0`|\n" "export SUBID"
+echo "+------------------------------------------+"
+printf "\n"
 
 sleep 2
 showHelp() {
@@ -27,6 +31,8 @@ cat << EOF
 bash $SCRIPT_NAME --help/-h  [for help]
 bash $SCRIPT_NAME --version/-v  [for version]
 bash $SCRIPT_NAME -g/--group <aks-rg-name> -n/--name <aks-name> -k/--aks-version -l/--location 
+
+Options:
 
 -h,        --help                           Display Help
 
@@ -81,6 +87,7 @@ done
 #if -h | --help option is selected usage will be displayed
 if [[ $HELP -eq 1 ]]
 then
+    echo -e "Usage: $SCRIPT_NAME [options]\n"
     showHelp
 	exit 0
 fi
@@ -116,7 +123,7 @@ fi
 }
 
 function destroy() {
-  array=( kubenet cni private )
+  array=( kubenet cni overlay nodesubnet private )
   echo -e "\n--> Warning: You are about to delete the whole environment\n"
   for i in ${array[@]}
   do
@@ -202,12 +209,10 @@ if [[ $AKS_HAS_AZURE_MONITOR -eq 1 && $AKS_HAS_AUTO_SCALER -eq 1 && $AKS_HAS_MAN
   --location $AKS_RG_LOCATION \
   --load-balancer-sku standard \
   --vnet-subnet-id $AKS_SNET_ID \
-  --vm-set-type $AKS_NP_VM_TYPE \
   --kubernetes-version $AKS_VERSION \
   --network-plugin $AKS_CNI_PLUGIN \
   --service-cidr $AKS_CLUSTER_SRV_CIDR \
   --dns-service-ip $AKS_CLUSTER_DNS \
-  --docker-bridge-address $AKS_CLUSTER_DOCKER_BRIDGE \
   --api-server-authorized-ip-ranges $MY_HOME_PUBLIC_IP"/32" \
   --ssh-key-value $ADMIN_USERNAME_SSH_KEYS_PUB \
   --admin-username $GENERIC_ADMIN_USERNAME \
@@ -224,7 +229,137 @@ if [[ $AKS_HAS_AZURE_MONITOR -eq 1 && $AKS_HAS_AUTO_SCALER -eq 1 && $AKS_HAS_MAN
   --zones $AKS_ZONES \
   --yes \
   --os-sku $OS_SKU \
-  --debug 
+  --debug
+elif [[ $AKS_HAS_OVERLAY_CNI -eq 1 && $AKS_HAS_AZURE_MONITOR -eq 1 && $AKS_HAS_AUTO_SCALER -eq 1 && $AKS_HAS_MANAGED_IDENTITY -eq 1 && $AKS_HAS_NETWORK_POLICY -eq 1 ]]; then
+  echo '>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>'
+  echo "Creating AKS with Azure CNI Overlay, Monitor Enabled, AutoScaler"
+  echo '>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>'
+   az aks create \
+  --resource-group $AKS_RG_NAME \
+  --name $AKS_CLUSTER_NAME \
+  --node-count $AKS_SYS_NP_NODE_COUNT \
+  --node-vm-size $AKS_SYS_NP_NODE_SIZE \
+  --location $AKS_RG_LOCATION \
+  --load-balancer-sku standard \
+  --vnet-subnet-id $AKS_SNET_ID \
+  --kubernetes-version $AKS_VERSION \
+  --network-plugin $AKS_CNI_PLUGIN \
+  --network-plugin-mode overlay \
+  --pod-cidr $AKS_POD_CIDR \
+  --service-cidr $AKS_SERVICE_CIDR \
+  --dns-service-ip $AKS_DNS_SERVICE_IP \
+  --api-server-authorized-ip-ranges $MY_HOME_PUBLIC_IP"/32" \
+  --ssh-key-value $ADMIN_USERNAME_SSH_KEYS_PUB \
+  --admin-username $GENERIC_ADMIN_USERNAME \
+  --enable-addons monitoring \
+  --enable-cluster-autoscaler \
+  --network-policy $AKS_NET_NPOLICY \
+  --min-count 1 \
+  --max-count 3 \
+  --enable-managed-identity \
+  --nodepool-name sysnp \
+  --nodepool-tags "env=sysnp" \
+  --max-pods $AKS_MAX_PODS_PER_NODE \
+  --node-resource-group $AKS_NODE_RESOURCE_GROUP$PURPOSE \
+  --zones $AKS_ZONES \
+  --yes \
+  --os-sku $OS_SKU \
+  --debug
+elif [[ $AKS_HAS_OVERLAY_CNI -eq 1 && $AKS_HAS_AZURE_MONITOR -eq 1 && $AKS_HAS_AUTO_SCALER -eq 1 && $AKS_HAS_MANAGED_IDENTITY -eq 0 && $AKS_HAS_NETWORK_POLICY -eq 0 ]]; then
+  echo '>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>'
+  echo "Creating AKS with Azure CNI Overlay, Monitor Enabled, AutoScaler"
+  echo '>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>'
+  az aks create \
+  --resource-group $AKS_RG_NAME \
+  --name $AKS_CLUSTER_NAME \
+  --node-count $AKS_SYS_NP_NODE_COUNT \
+  --node-vm-size $AKS_SYS_NP_NODE_SIZE \
+  --location $AKS_RG_LOCATION \
+  --load-balancer-sku standard \
+  --vnet-subnet-id $AKS_SNET_ID \
+  --kubernetes-version $AKS_VERSION \
+  --network-plugin $AKS_CNI_PLUGIN \
+  --network-plugin-mode overlay \
+  --pod-cidr $AKS_POD_CIDR \
+  --service-cidr $AKS_SERVICE_CIDR \
+  --dns-service-ip $AKS_DNS_SERVICE_IP \
+  --api-server-authorized-ip-ranges $MY_HOME_PUBLIC_IP"/32" \
+  --ssh-key-value $ADMIN_USERNAME_SSH_KEYS_PUB \
+  --admin-username $GENERIC_ADMIN_USERNAME \
+  --enable-addons monitoring \
+  --enable-cluster-autoscaler \
+  --min-count 1 \
+  --max-count 3 \
+  --nodepool-name sysnp \
+  --nodepool-tags "env=sysnp" \
+  --max-pods $AKS_MAX_PODS_PER_NODE \
+  --node-resource-group $AKS_NODE_RESOURCE_GROUP$PURPOSE \
+  --zones $AKS_ZONES \
+  --yes \
+  --os-sku $OS_SKU \
+  --debug
+elif [[ $AKS_HAS_OVERLAY_CNI -eq 1 && $AKS_HAS_AZURE_MONITOR -eq 0 && $AKS_HAS_AUTO_SCALER -eq 1 && $AKS_HAS_MANAGED_IDENTITY -eq 0 && $AKS_HAS_NETWORK_POLICY -eq 0 ]]; then
+  echo '>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>'
+  echo "Creating AKS with Azure CNI Overlay, AutoScaler"
+  echo '>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>'
+  az aks create \
+  --resource-group $AKS_RG_NAME \
+  --name $AKS_CLUSTER_NAME \
+  --node-count $AKS_SYS_NP_NODE_COUNT \
+  --node-vm-size $AKS_SYS_NP_NODE_SIZE \
+  --location $AKS_RG_LOCATION \
+  --load-balancer-sku standard \
+  --vnet-subnet-id $AKS_SNET_ID \
+  --kubernetes-version $AKS_VERSION \
+  --network-plugin $AKS_CNI_PLUGIN \
+  --network-plugin-mode overlay \
+  --pod-cidr $AKS_POD_CIDR \
+  --service-cidr $AKS_SERVICE_CIDR \
+  --dns-service-ip $AKS_DNS_SERVICE_IP \
+  --api-server-authorized-ip-ranges $MY_HOME_PUBLIC_IP"/32" \
+  --ssh-key-value $ADMIN_USERNAME_SSH_KEYS_PUB \
+  --admin-username $GENERIC_ADMIN_USERNAME \
+  --enable-cluster-autoscaler \
+  --min-count 1 \
+  --max-count 3 \
+  --nodepool-name sysnp \
+  --nodepool-tags "env=sysnp" \
+  --max-pods $AKS_MAX_PODS_PER_NODE \
+  --node-resource-group $AKS_NODE_RESOURCE_GROUP$PURPOSE \
+  --zones $AKS_ZONES \
+  --yes \
+  --os-sku $OS_SKU \
+  --debug
+ 
+elif [[ $AKS_HAS_OVERLAY_CNI -eq 1 && $AKS_HAS_AZURE_MONITOR -eq 0 && $AKS_HAS_AUTO_SCALER -eq 0 && $AKS_HAS_MANAGED_IDENTITY -eq 0 && $AKS_HAS_NETWORK_POLICY -eq 0 ]]; then
+  echo '>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>'
+  echo "Creating AKS with Azure CNI Overlay"
+  echo '>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>'
+  az aks create \
+  --resource-group $AKS_RG_NAME \
+  --name $AKS_CLUSTER_NAME \
+  --node-count $AKS_SYS_NP_NODE_COUNT \
+  --node-vm-size $AKS_SYS_NP_NODE_SIZE \
+  --location $AKS_RG_LOCATION \
+  --load-balancer-sku standard \
+  --vnet-subnet-id $AKS_SNET_ID \
+  --kubernetes-version $AKS_VERSION \
+  --network-plugin $AKS_CNI_PLUGIN \
+  --network-plugin-mode overlay \
+  --pod-cidr $AKS_POD_CIDR \
+  --service-cidr $AKS_CLUSTER_SRV_CIDR \
+  --dns-service-ip $AKS_CLUSTER_DNS \
+  --api-server-authorized-ip-ranges $MY_HOME_PUBLIC_IP"/32" \
+  --ssh-key-value $ADMIN_USERNAME_SSH_KEYS_PUB \
+  --admin-username $GENERIC_ADMIN_USERNAME \
+  --nodepool-name sysnp \
+  --nodepool-tags "env=sysnp" \
+  --max-pods $AKS_MAX_PODS_PER_NODE \
+  --node-resource-group $AKS_NODE_RESOURCE_GROUP$PURPOSE \
+  --zones $AKS_ZONES \
+  --yes \
+  --os-sku $OS_SKU \
+  --debug
 elif [[ $AKS_HAS_AZURE_MONITOR -eq 1 && $AKS_HAS_AUTO_SCALER -eq 1 && $AKS_HAS_MANAGED_IDENTITY -eq 1 && $AKS_HAS_NETWORK_POLICY -eq 0 ]]; then
   echo '>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>'
   echo "Creating AKS with Monitor Enabled, AutoScaler, Managed Identity and Net Pol $AKS_NET_NPOLICY"
@@ -237,12 +372,10 @@ elif [[ $AKS_HAS_AZURE_MONITOR -eq 1 && $AKS_HAS_AUTO_SCALER -eq 1 && $AKS_HAS_M
   --location $AKS_RG_LOCATION \
   --load-balancer-sku standard \
   --vnet-subnet-id $AKS_SNET_ID \
-  --vm-set-type $AKS_NP_VM_TYPE \
   --kubernetes-version $AKS_VERSION \
   --network-plugin $AKS_CNI_PLUGIN \
   --service-cidr $AKS_CLUSTER_SRV_CIDR \
   --dns-service-ip $AKS_CLUSTER_DNS \
-  --docker-bridge-address $AKS_CLUSTER_DOCKER_BRIDGE \
   --api-server-authorized-ip-ranges $MY_HOME_PUBLIC_IP"/32" \
   --ssh-key-value $ADMIN_USERNAME_SSH_KEYS_PUB \
   --admin-username $GENERIC_ADMIN_USERNAME \
@@ -261,7 +394,7 @@ elif [[ $AKS_HAS_AZURE_MONITOR -eq 1 && $AKS_HAS_AUTO_SCALER -eq 1 && $AKS_HAS_M
   --debug
 elif [[ $AKS_HAS_AZURE_MONITOR -eq 1 && $AKS_HAS_AUTO_SCALER -eq 0 && $AKS_HAS_MANAGED_IDENTITY -eq 1 && $AKS_HAS_NETWORK_POLICY -eq 0 ]]; then
   echo '>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>'
-  echo "Creating AKS with Monitor Enabled, Managed Idenity and Net Pol $AKS_NET_NPOLICY"
+  echo "Creating AKS with Monitor Enabled, Managed Identity and Networ Policy $AKS_NET_NPOLICY"
   echo '>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>'
   az aks create \
   --resource-group $AKS_RG_NAME \
@@ -271,12 +404,10 @@ elif [[ $AKS_HAS_AZURE_MONITOR -eq 1 && $AKS_HAS_AUTO_SCALER -eq 0 && $AKS_HAS_M
   --location $AKS_RG_LOCATION \
   --load-balancer-sku standard \
   --vnet-subnet-id $AKS_SNET_ID \
-  --vm-set-type $AKS_NP_VM_TYPE \
   --kubernetes-version $AKS_VERSION \
   --network-plugin $AKS_CNI_PLUGIN \
   --service-cidr $AKS_CLUSTER_SRV_CIDR \
   --dns-service-ip $AKS_CLUSTER_DNS \
-  --docker-bridge-address $AKS_CLUSTER_DOCKER_BRIDGE \
   --api-server-authorized-ip-ranges $MY_HOME_PUBLIC_IP"/32" \
   --ssh-key-value $ADMIN_USERNAME_SSH_KEYS_PUB \
   --admin-username $GENERIC_ADMIN_USERNAME \
@@ -304,12 +435,10 @@ elif [[ $AKS_HAS_AZURE_MONITOR -eq 1 && $AKS_HAS_AUTO_SCALER -eq 1 && $AKS_HAS_M
   --location $AKS_RG_LOCATION \
   --load-balancer-sku standard \
   --vnet-subnet-id $AKS_SNET_ID \
-  --vm-set-type $AKS_NP_VM_TYPE \
   --kubernetes-version $AKS_VERSION \
   --network-plugin $AKS_CNI_PLUGIN \
   --service-cidr $AKS_CLUSTER_SRV_CIDR \
   --dns-service-ip $AKS_CLUSTER_DNS \
-  --docker-bridge-address $AKS_CLUSTER_DOCKER_BRIDGE \
   --api-server-authorized-ip-ranges $MY_HOME_PUBLIC_IP"/32" \
   --ssh-key-value $ADMIN_USERNAME_SSH_KEYS_PUB \
   --admin-username $GENERIC_ADMIN_USERNAME \
@@ -338,12 +467,10 @@ elif [[ $AKS_HAS_AZURE_MONITOR -eq 1 && $AKS_HAS_AUTO_SCALER -eq 0 && $AKS_HAS_M
   --location $AKS_RG_LOCATION \
   --load-balancer-sku standard \
   --vnet-subnet-id $AKS_SNET_ID \
-  --vm-set-type $AKS_NP_VM_TYPE \
   --kubernetes-version $AKS_VERSION \
   --network-plugin $AKS_CNI_PLUGIN \
   --service-cidr $AKS_CLUSTER_SRV_CIDR \
   --dns-service-ip $AKS_CLUSTER_DNS \
-  --docker-bridge-address $AKS_CLUSTER_DOCKER_BRIDGE \
   --api-server-authorized-ip-ranges $MY_HOME_PUBLIC_IP"/32" \
   --ssh-key-value $ADMIN_USERNAME_SSH_KEYS_PUB \
   --admin-username $GENERIC_ADMIN_USERNAME \
@@ -357,7 +484,7 @@ elif [[ $AKS_HAS_AZURE_MONITOR -eq 1 && $AKS_HAS_AUTO_SCALER -eq 0 && $AKS_HAS_M
   --debug
 elif [[ $AKS_HAS_AZURE_MONITOR -eq 0 && $AKS_HAS_AUTO_SCALER -eq 0 && $AKS_HAS_MANAGED_IDENTITY -eq 1 && $AKS_HAS_NETWORK_POLICY -eq 0 ]]; then
   echo '>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>'
-  echo "Creating AKS with Managed Identity and Net Pol $AKS_NET_NPOLICY"
+  echo "Creating AKS with Managed Identity"
   echo '>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>'
   az aks create \
   --resource-group $AKS_RG_NAME \
@@ -367,12 +494,10 @@ elif [[ $AKS_HAS_AZURE_MONITOR -eq 0 && $AKS_HAS_AUTO_SCALER -eq 0 && $AKS_HAS_M
   --location $AKS_RG_LOCATION \
   --load-balancer-sku standard \
   --vnet-subnet-id $AKS_SNET_ID \
-  --vm-set-type $AKS_NP_VM_TYPE \
   --kubernetes-version $AKS_VERSION \
   --network-plugin $AKS_CNI_PLUGIN \
   --service-cidr $AKS_CLUSTER_SRV_CIDR \
   --dns-service-ip $AKS_CLUSTER_DNS \
-  --docker-bridge-address $AKS_CLUSTER_DOCKER_BRIDGE \
   --api-server-authorized-ip-ranges $MY_HOME_PUBLIC_IP"/32" \
   --ssh-key-value $ADMIN_USERNAME_SSH_KEYS_PUB \
   --admin-username $GENERIC_ADMIN_USERNAME \
@@ -397,12 +522,10 @@ elif [[ $AKS_HAS_AZURE_MONITOR -eq 0 && $AKS_HAS_AUTO_SCALER -eq 0 && $AKS_HAS_M
   --location $AKS_RG_LOCATION \
   --load-balancer-sku standard \
   --vnet-subnet-id $AKS_SNET_ID \
-  --vm-set-type $AKS_NP_VM_TYPE \
   --kubernetes-version $AKS_VERSION \
   --network-plugin $AKS_CNI_PLUGIN \
   --service-cidr $AKS_CLUSTER_SRV_CIDR \
   --dns-service-ip $AKS_CLUSTER_DNS \
-  --docker-bridge-address $AKS_CLUSTER_DOCKER_BRIDGE \
   --api-server-authorized-ip-ranges $MY_HOME_PUBLIC_IP"/32" \
   --ssh-key-value $ADMIN_USERNAME_SSH_KEYS_PUB \
   --admin-username $GENERIC_ADMIN_USERNAME \
@@ -429,12 +552,10 @@ elif [[ $AKS_HAS_AZURE_MONITOR -eq 1 && $AKS_HAS_AUTO_SCALER -eq 0 && $AKS_HAS_M
   --location $AKS_RG_LOCATION \
   --load-balancer-sku standard \
   --vnet-subnet-id $AKS_SNET_ID \
-  --vm-set-type $AKS_NP_VM_TYPE \
   --kubernetes-version $AKS_VERSION \
   --network-plugin $AKS_CNI_PLUGIN \
   --service-cidr $AKS_CLUSTER_SRV_CIDR \
   --dns-service-ip $AKS_CLUSTER_DNS \
-  --docker-bridge-address $AKS_CLUSTER_DOCKER_BRIDGE \
   --api-server-authorized-ip-ranges $MY_HOME_PUBLIC_IP"/32" \
   --ssh-key-value $ADMIN_USERNAME_SSH_KEYS_PUB \
   --admin-username $GENERIC_ADMIN_USERNAME \
@@ -460,12 +581,10 @@ elif [[ $AKS_HAS_AZURE_MONITOR -eq 0 && $AKS_HAS_AUTO_SCALER -eq 1 && $AKS_HAS_M
   --location $AKS_RG_LOCATION \
   --load-balancer-sku standard \
   --vnet-subnet-id $AKS_SNET_ID \
-  --vm-set-type $AKS_NP_VM_TYPE \
   --kubernetes-version $AKS_VERSION \
   --network-plugin $AKS_CNI_PLUGIN \
   --service-cidr $AKS_CLUSTER_SRV_CIDR \
   --dns-service-ip $AKS_CLUSTER_DNS \
-  --docker-bridge-address $AKS_CLUSTER_DOCKER_BRIDGE \
   --api-server-authorized-ip-ranges $MY_HOME_PUBLIC_IP"/32" \
   --ssh-key-value $ADMIN_USERNAME_SSH_KEYS_PUB \
   --admin-username $GENERIC_ADMIN_USERNAME \
@@ -492,12 +611,10 @@ elif [[ $AKS_HAS_AZURE_MONITOR -eq 0 && $AKS_HAS_AUTO_SCALER -eq 1 && $AKS_HAS_M
   --location $AKS_RG_LOCATION \
   --load-balancer-sku standard \
   --vnet-subnet-id $AKS_SNET_ID \
-  --vm-set-type $AKS_NP_VM_TYPE \
   --kubernetes-version $AKS_VERSION \
   --network-plugin $AKS_CNI_PLUGIN \
   --service-cidr $AKS_CLUSTER_SRV_CIDR \
   --dns-service-ip $AKS_CLUSTER_DNS \
-  --docker-bridge-address $AKS_CLUSTER_DOCKER_BRIDGE \
   --api-server-authorized-ip-ranges $MY_HOME_PUBLIC_IP"/32" \
   --ssh-key-value $ADMIN_USERNAME_SSH_KEYS_PUB \
   --admin-username $GENERIC_ADMIN_USERNAME \
@@ -528,12 +645,10 @@ else
   --location $AKS_RG_LOCATION \
   --load-balancer-sku standard \
   --vnet-subnet-id $AKS_SNET_ID \
-  --vm-set-type $AKS_NP_VM_TYPE \
   --kubernetes-version $AKS_VERSION \
   --network-plugin $AKS_CNI_PLUGIN \
   --service-cidr $AKS_CLUSTER_SRV_CIDR \
   --dns-service-ip $AKS_CLUSTER_DNS \
-  --docker-bridge-address $AKS_CLUSTER_DOCKER_BRIDGE \
   --api-server-authorized-ip-ranges $MY_HOME_PUBLIC_IP"/32" \
   --ssh-key-value $ADMIN_USERNAME_SSH_KEYS_PUB \
   --admin-username $GENERIC_ADMIN_USERNAME \
@@ -546,10 +661,6 @@ else
   --debug
 fi
 
-## Logic for VMASS only
-if [[ "$AKS_NP_VM_TYPE" == "AvailabilitySet" ]]; then
-  echo "Skip second Nodepool - VMAS dont have it"
-else
   if [[ "$AKS_HAS_2ND_NODEPOOL"  == "1" ]]; then
   ## Add User nodepooll
   echo 'Add Node pool type User'
@@ -569,7 +680,6 @@ else
     --os-sku $OS_SKU \
     --debug
   fi
-fi
 
 
 if [[ "$AKS_CREATE_JUMP_SERVER" == "1" ]] 
@@ -792,12 +902,10 @@ if [[ $AKS_HAS_AZURE_MONITOR -eq 1 && $AKS_HAS_AUTO_SCALER -eq 1 && $AKS_HAS_MAN
   --location $AKS_RG_LOCATION \
   --load-balancer-sku standard \
   --vnet-subnet-id $AKS_SNET_ID \
-  --vm-set-type $AKS_NP_VM_TYPE \
   --kubernetes-version $AKS_VERSION \
   --network-plugin $AKS_CNI_PLUGIN \
   --service-cidr $AKS_CLUSTER_SRV_CIDR \
   --dns-service-ip $AKS_CLUSTER_DNS \
-  --docker-bridge-address $AKS_CLUSTER_DOCKER_BRIDGE \
   --ssh-key-value $ADMIN_USERNAME_SSH_KEYS_PUB \
   --admin-username $GENERIC_ADMIN_USERNAME \
   --enable-addons monitoring \
@@ -825,12 +933,10 @@ elif [[ $AKS_HAS_AZURE_MONITOR -eq 1 && $AKS_HAS_AUTO_SCALER -eq 1 && $AKS_HAS_M
   --location $AKS_RG_LOCATION \
   --load-balancer-sku standard \
   --vnet-subnet-id $AKS_SNET_ID \
-  --vm-set-type $AKS_NP_VM_TYPE \
   --kubernetes-version $AKS_VERSION \
   --network-plugin $AKS_CNI_PLUGIN \
   --service-cidr $AKS_CLUSTER_SRV_CIDR \
   --dns-service-ip $AKS_CLUSTER_DNS \
-  --docker-bridge-address $AKS_CLUSTER_DOCKER_BRIDGE \
   --ssh-key-value $ADMIN_USERNAME_SSH_KEYS_PUB \
   --admin-username $GENERIC_ADMIN_USERNAME \
   --enable-addons monitoring \
@@ -857,12 +963,10 @@ elif [[ $AKS_HAS_AZURE_MONITOR -eq 1 && $AKS_HAS_AUTO_SCALER -eq 0 && $AKS_HAS_M
   --location $AKS_RG_LOCATION \
   --load-balancer-sku standard \
   --vnet-subnet-id $AKS_SNET_ID \
-  --vm-set-type $AKS_NP_VM_TYPE \
   --kubernetes-version $AKS_VERSION \
   --network-plugin $AKS_CNI_PLUGIN \
   --service-cidr $AKS_CLUSTER_SRV_CIDR \
   --dns-service-ip $AKS_CLUSTER_DNS \
-  --docker-bridge-address $AKS_CLUSTER_DOCKER_BRIDGE \
   --ssh-key-value $ADMIN_USERNAME_SSH_KEYS_PUB \
   --admin-username $GENERIC_ADMIN_USERNAME \
   --enable-addons monitoring \
@@ -888,12 +992,10 @@ elif [[ $AKS_HAS_AZURE_MONITOR -eq 1 && $AKS_HAS_AUTO_SCALER -eq 1 && $AKS_HAS_M
   --location $AKS_RG_LOCATION \
   --load-balancer-sku standard \
   --vnet-subnet-id $AKS_SNET_ID \
-  --vm-set-type $AKS_NP_VM_TYPE \
   --kubernetes-version $AKS_VERSION \
   --network-plugin $AKS_CNI_PLUGIN \
   --service-cidr $AKS_CLUSTER_SRV_CIDR \
   --dns-service-ip $AKS_CLUSTER_DNS \
-  --docker-bridge-address $AKS_CLUSTER_DOCKER_BRIDGE \
   --ssh-key-value $ADMIN_USERNAME_SSH_KEYS_PUB \
   --admin-username $GENERIC_ADMIN_USERNAME \
   --enable-addons monitoring \
@@ -920,12 +1022,10 @@ elif [[ $AKS_HAS_AZURE_MONITOR -eq 1 && $AKS_HAS_AUTO_SCALER -eq 0 && $AKS_HAS_M
   --location $AKS_RG_LOCATION \
   --load-balancer-sku standard \
   --vnet-subnet-id $AKS_SNET_ID \
-  --vm-set-type $AKS_NP_VM_TYPE \
   --kubernetes-version $AKS_VERSION \
   --network-plugin $AKS_CNI_PLUGIN \
   --service-cidr $AKS_CLUSTER_SRV_CIDR \
   --dns-service-ip $AKS_CLUSTER_DNS \
-  --docker-bridge-address $AKS_CLUSTER_DOCKER_BRIDGE \
   --ssh-key-value $ADMIN_USERNAME_SSH_KEYS_PUB \
   --admin-username $GENERIC_ADMIN_USERNAME \
   --enable-addons monitoring \
@@ -947,12 +1047,10 @@ elif [[ $AKS_HAS_AZURE_MONITOR -eq 0 && $AKS_HAS_AUTO_SCALER -eq 0 && $AKS_HAS_M
   --location $AKS_RG_LOCATION \
   --load-balancer-sku standard \
   --vnet-subnet-id $AKS_SNET_ID \
-  --vm-set-type $AKS_NP_VM_TYPE \
   --kubernetes-version $AKS_VERSION \
   --network-plugin $AKS_CNI_PLUGIN \
   --service-cidr $AKS_CLUSTER_SRV_CIDR \
   --dns-service-ip $AKS_CLUSTER_DNS \
-  --docker-bridge-address $AKS_CLUSTER_DOCKER_BRIDGE \
   --ssh-key-value $ADMIN_USERNAME_SSH_KEYS_PUB \
   --admin-username $GENERIC_ADMIN_USERNAME \
   --enable-managed-identity \
@@ -975,12 +1073,10 @@ elif [[ $AKS_HAS_AZURE_MONITOR -eq 0 && $AKS_HAS_AUTO_SCALER -eq 0 && $AKS_HAS_M
   --location $AKS_RG_LOCATION \
   --load-balancer-sku standard \
   --vnet-subnet-id $AKS_SNET_ID \
-  --vm-set-type $AKS_NP_VM_TYPE \
   --kubernetes-version $AKS_VERSION \
   --network-plugin $AKS_CNI_PLUGIN \
   --service-cidr $AKS_CLUSTER_SRV_CIDR \
   --dns-service-ip $AKS_CLUSTER_DNS \
-  --docker-bridge-address $AKS_CLUSTER_DOCKER_BRIDGE \
   --ssh-key-value $ADMIN_USERNAME_SSH_KEYS_PUB \
   --admin-username $GENERIC_ADMIN_USERNAME \
   --enable-managed-identity \
@@ -1006,12 +1102,10 @@ elif [[ $AKS_HAS_AZURE_MONITOR -eq 1 && $AKS_HAS_AUTO_SCALER -eq 0 && $AKS_HAS_M
   --location $AKS_RG_LOCATION \
   --load-balancer-sku standard \
   --vnet-subnet-id $AKS_SNET_ID \
-  --vm-set-type $AKS_NP_VM_TYPE \
   --kubernetes-version $AKS_VERSION \
   --network-plugin $AKS_CNI_PLUGIN \
   --service-cidr $AKS_CLUSTER_SRV_CIDR \
   --dns-service-ip $AKS_CLUSTER_DNS \
-  --docker-bridge-address $AKS_CLUSTER_DOCKER_BRIDGE \
   --ssh-key-value $ADMIN_USERNAME_SSH_KEYS_PUB \
   --admin-username $GENERIC_ADMIN_USERNAME \
   --enable-addons monitoring \
@@ -1035,12 +1129,10 @@ elif [[ $AKS_HAS_AZURE_MONITOR -eq 0 && $AKS_HAS_AUTO_SCALER -eq 1 && $AKS_HAS_M
   --location $AKS_RG_LOCATION \
   --load-balancer-sku standard \
   --vnet-subnet-id $AKS_SNET_ID \
-  --vm-set-type $AKS_NP_VM_TYPE \
   --kubernetes-version $AKS_VERSION \
   --network-plugin $AKS_CNI_PLUGIN \
   --service-cidr $AKS_CLUSTER_SRV_CIDR \
   --dns-service-ip $AKS_CLUSTER_DNS \
-  --docker-bridge-address $AKS_CLUSTER_DOCKER_BRIDGE \
   --ssh-key-value $ADMIN_USERNAME_SSH_KEYS_PUB \
   --admin-username $GENERIC_ADMIN_USERNAME \
   --enable-cluster-autoscaler \
@@ -1065,12 +1157,10 @@ elif [[ $AKS_HAS_AZURE_MONITOR -eq 0 && $AKS_HAS_AUTO_SCALER -eq 1 && $AKS_HAS_M
   --location $AKS_RG_LOCATION \
   --load-balancer-sku standard \
   --vnet-subnet-id $AKS_SNET_ID \
-  --vm-set-type $AKS_NP_VM_TYPE \
   --kubernetes-version $AKS_VERSION \
   --network-plugin $AKS_CNI_PLUGIN \
   --service-cidr $AKS_CLUSTER_SRV_CIDR \
   --dns-service-ip $AKS_CLUSTER_DNS \
-  --docker-bridge-address $AKS_CLUSTER_DOCKER_BRIDGE \
   --ssh-key-value $ADMIN_USERNAME_SSH_KEYS_PUB \
   --admin-username $GENERIC_ADMIN_USERNAME \
   --enable-cluster-autoscaler \
@@ -1099,12 +1189,10 @@ else
   --location $AKS_RG_LOCATION \
   --load-balancer-sku standard \
   --vnet-subnet-id $AKS_SNET_ID \
-  --vm-set-type $AKS_NP_VM_TYPE \
   --kubernetes-version $AKS_VERSION \
   --network-plugin $AKS_CNI_PLUGIN \
   --service-cidr $AKS_CLUSTER_SRV_CIDR \
   --dns-service-ip $AKS_CLUSTER_DNS \
-  --docker-bridge-address $AKS_CLUSTER_DOCKER_BRIDGE \
   --ssh-key-value $ADMIN_USERNAME_SSH_KEYS_PUB \
   --admin-username $GENERIC_ADMIN_USERNAME \
   --nodepool-name sysnp \
@@ -2060,7 +2148,7 @@ echo "Sleeping 10s - Allow time for DNS Servers to be changed at VNET Level"
 countdown "00:00:10"
 
 
-printf "|`tput bold` %-40s `tput sgr0`|\n" "After changing the DNS server at VNET level you will need to perform a DHCP_Release on the nodes so trigger the script again and choose option 8"
+printf "|`tput bold` %-40s `tput sgr0`|\n" "After changing the DNS server at VNET level you will need to perform a DHCP_Release on the nodes so trigger the script again and choose option 10"
 }
 
 function dhcp_release() {
@@ -2401,25 +2489,37 @@ printf "|`tput bold` %-40s `tput sgr0`|\n" "In case you have an existing AKS clu
 
 }
 
-options=("Azure Cluster" "Kubenet Cluster" "Private Cluster" "List existing AKS Clusters" "Create Linux VM on Subnet" "Linux DNS VM" "Windows DNS VM" "DHCP Release" "Helm Nginx Ingress Controller" "Helm Nginx Ingress Controller-Internal" "AGIC-Brownfield" "Destroy Environment" "Quit")
+options=("Azure Cluster CNI (Legacy)" "Overlay Cluster" "PodSubnet Cluster" "Kubenet Cluster" "Private Cluster" "List existing AKS Clusters" "Create Linux VM on Subnet" "Linux DNS VM" "Windows DNS VM" "DHCP Release" "Helm Nginx Ingress Controller" "Helm Nginx Ingress Controller-Internal" "AGIC-Brownfield" "Destroy Environment" "Quit")
 select opt in "${options[@]}"
 do    
 	case $opt in
-      "Azure Cluster")
+      "Azure Cluster CNI (Legacy)")
         az_login_check
         PURPOSE="cni"
         check_k8s_version
         sleep 2
         azure_cluster
         break;;
+      "Overlay Cluster")
+        az_login_check
+        PURPOSE="overlay"
+        check_k8s_version
+        sleep 2
+        AKS_HAS_OVERLAY_CNI="1"
+        azure_cluster
+        break;;
+      "PodSubnet Cluster")
+        az_login_check
+        check_k8s_version
+        sleep 2
+        PURPOSE="podsubnet"
+        azure_cluster
+        break;;
       "Kubenet Cluster")
         az_login_check
         PURPOSE="kubenet"
-        AKS_CNI_PLUGIN="kubenet"
-        check_k8s_version
-        sleep 2
         azure_cluster
-	      break;;
+        break;;
 	    "Private Cluster")
         az_login_check
         PURPOSE="private"
@@ -2480,6 +2580,6 @@ do
          exit 0
             break
             ;;
-        *) echo "Invalid Option $REPLY";;
+        *) echo "Invalid Option $REPLY, please use one of the below options:";;
     esac
 done
